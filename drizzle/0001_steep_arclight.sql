@@ -1,0 +1,1 @@
+ALTER TABLE `orderItems` ADD `isPaid` integer DEFAULT false NOT NULL;

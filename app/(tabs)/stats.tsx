@@ -1,0 +1,153 @@
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { Text, View } from '@/components/Themed';
+import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { db } from '@/db';
+import { persons, items, orderItems, orders } from '@/db/schema';
+import { api } from '@/db/api';
+import CreateItemModal from '@/components/CreateItemModal';
+
+export default function StatsScreen() {
+  const { data: peopleList } = useLiveQuery(db.select().from(persons));
+  const { data: catalog } = useLiveQuery(db.select().from(items));
+  const { data: allOrders } = useLiveQuery(db.select().from(orders));
+  const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
+
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+
+  const stats = useMemo(() => {
+    if (!peopleList || !catalog || !allOrders || !allOrderItems) return null;
+
+    const personTotals: Record<string, { name: string; total: number }> = {};
+    const itemPopularity: Record<string, { name: string; qty: number }> = {};
+    let totalSpent = 0;
+
+    peopleList.forEach((p) => {
+      personTotals[p.id] = { name: p.name, total: 0 };
+    });
+
+    catalog.forEach((c) => {
+      itemPopularity[c.id] = { name: c.name, qty: 0 };
+    });
+
+    allOrderItems.forEach((oi) => {
+      const order = allOrders.find((o) => o.id === oi.orderId);
+      if (order && personTotals[order.personId]) {
+        const cost = (oi.unitPrice ?? 0) * oi.quantity;
+        personTotals[order.personId].total += cost;
+        totalSpent += cost;
+      }
+      if (itemPopularity[oi.itemId]) {
+        itemPopularity[oi.itemId].qty += oi.quantity;
+      }
+    });
+
+    const topItems = Object.values(itemPopularity)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+
+    const topSpenders = Object.values(personTotals)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+
+    return { totalSpent, topItems, topSpenders, totalOrders: allOrders.length };
+  }, [peopleList, catalog, allOrders, allOrderItems]);
+
+  const handleEditClick = (item: any) => {
+    setEditingItem(item);
+  };
+
+  const handleSaveItem = async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime') => {
+    if (!editingItem) return;
+    await api.updateItem(editingItem.id, {
+      name,
+      defaultPrice,
+      source,
+      timing,
+    });
+    setEditingItem(null);
+  };
+
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        
+        {/* STATISTICS SECTION */}
+        <Text style={styles.sectionTitle}>📊 App Statistics</Text>
+        {stats && (
+          <View style={styles.statsCard}>
+            <Text style={styles.statText}>Total Money Handled: <Text style={styles.highlight}>${stats.totalSpent.toFixed(2)}</Text></Text>
+            <Text style={styles.statText}>Total Orders Created: <Text style={styles.highlight}>{stats.totalOrders}</Text></Text>
+            
+            <Text style={styles.subTitle}>🏆 Top Spenders</Text>
+            {stats.topSpenders.map((p, idx) => (
+              <Text key={idx} style={styles.listItem}>{idx + 1}. {p.name} - ${p.total.toFixed(2)}</Text>
+            ))}
+
+            <Text style={styles.subTitle}>🔥 Most Popular Items</Text>
+            {stats.topItems.map((i, idx) => (
+              <Text key={idx} style={styles.listItem}>{idx + 1}. {i.name} ({i.qty} ordered)</Text>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.separator} />
+
+        {/* ITEMS DICTIONARY SECTION */}
+        <Text style={styles.sectionTitle}>📖 Items Dictionary</Text>
+        <Text style={styles.helperText}>Update default prices, sources, and timing for your items here.</Text>
+
+        {catalog?.map((item) => (
+          <View key={item.id} style={styles.itemCard}>
+            <View style={styles.itemHeader}>
+              <Text style={styles.itemName}>{item.name}</Text>
+              <TouchableOpacity onPress={() => handleEditClick(item)}>
+                <Text style={styles.editBtn}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.itemDetails}>
+              <Text style={styles.detailText}>Price: {item.defaultPrice ? `$${item.defaultPrice}` : 'Not known yet'}</Text>
+              <Text style={styles.detailText}>Source: {item.source || 'Not known yet'}</Text>
+              <Text style={styles.detailText}>Timing: {item.timing}</Text>
+            </View>
+          </View>
+        ))}
+
+      </ScrollView>
+
+      {editingItem && (
+        <CreateItemModal
+          visible={!!editingItem}
+          title="Edit Item"
+          submitLabel="Save Changes"
+          initialName={editingItem.name}
+          initialPrice={editingItem.defaultPrice}
+          initialSource={editingItem.source}
+          initialTiming={editingItem.timing}
+          onCancel={() => setEditingItem(null)}
+          onSubmit={handleSaveItem}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  content: { padding: 15 },
+  sectionTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 15, color: '#fff' },
+  statsCard: { backgroundColor: '#333', padding: 15, borderRadius: 10, marginBottom: 20 },
+  statText: { fontSize: 16, color: '#ccc', marginBottom: 5 },
+  highlight: { color: '#ffeb3b', fontWeight: 'bold', fontSize: 18 },
+  subTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginTop: 15, marginBottom: 10 },
+  listItem: { color: '#ddd', fontSize: 15, marginLeft: 10, marginBottom: 5 },
+  separator: { height: 1, backgroundColor: '#555', marginVertical: 20 },
+  helperText: { color: '#888', marginBottom: 15 },
+  itemCard: { backgroundColor: '#222', padding: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#444' },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  itemName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  editBtn: { color: '#2f95dc', fontWeight: 'bold', padding: 5 },
+  itemDetails: { gap: 5 },
+  detailText: { color: '#ccc' },
+});

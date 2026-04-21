@@ -7,6 +7,9 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
+import migrations from '../drizzle/migrations';
+import { db } from '../db';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -27,18 +30,21 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
+  const { success: migrationSuccess, error: migrationError } = useMigrations(db, migrations);
+
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
-  }, [error]);
+    if (migrationError) throw migrationError;
+  }, [error, migrationError]);
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && migrationSuccess) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [loaded, migrationSuccess]);
 
-  if (!loaded) {
+  if (!loaded || !migrationSuccess) {
     return null;
   }
 

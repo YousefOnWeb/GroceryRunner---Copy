@@ -1,0 +1,39 @@
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+
+export const persons = sqliteTable('persons', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  balance: real('balance').notNull().default(0),
+});
+
+export const items = sqliteTable('items', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  defaultPrice: real('defaultPrice'),
+  source: text('source'),
+  timing: text('timing', { enum: ['Fresh', 'Anytime'] }).notNull().default('Fresh'),
+});
+
+export const orders = sqliteTable('orders', {
+  id: text('id').primaryKey(),
+  personId: text('personId').notNull().references(() => persons.id),
+  targetDate: text('targetDate').notNull(), // 'YYYY-MM-DD'
+  isPaid: integer('isPaid', { mode: 'boolean' }).notNull().default(false),
+});
+
+export const orderItems = sqliteTable('orderItems', {
+  id: text('id').primaryKey(),
+  orderId: text('orderId').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  itemId: text('itemId').notNull().references(() => items.id),
+  quantity: integer('quantity').notNull().default(1),
+  unitPrice: real('unitPrice'),
+  isPaid: integer('isPaid', { mode: 'boolean' }).notNull().default(false),
+});
+
+export const transactions = sqliteTable('transactions', {
+  id: text('id').primaryKey(),
+  personId: text('personId').notNull().references(() => persons.id),
+  amount: real('amount').notNull(),
+  date: text('date').notNull(), // ISO datetime
+  type: text('type', { enum: ['PaymentReceived', 'OrderCost', 'ManualAdjustment'] }).notNull(),
+});

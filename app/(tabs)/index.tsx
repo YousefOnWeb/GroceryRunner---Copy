@@ -1,31 +1,291 @@
-import { StyleSheet } from 'react-native';
-
-import EditScreenInfo from '@/components/EditScreenInfo';
+import DropdownSelect from '@/components/DropdownSelect';
 import { Text, View } from '@/components/Themed';
+import { db } from '@/db';
+import { api } from '@/db/api';
+import { items, orderItems, orders, persons } from '@/db/schema';
+import { extractDateValue, generateDateOptions } from '@/utils/dates';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import React, { useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
-export default function TabOneScreen() {
+export default function TheRunScreen() {
+  const dateOptions = useMemo(() => generateDateOptions(30), []);
+  // Set default to Tomorrow's label
+  const [targetDateSelection, setTargetDateSelection] = useState(dateOptions[1]);
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const [paidItems, setPaidItems] = useState<Record<string, boolean>>({});
+
+  const { data: allOrders } = useLiveQuery(db.select().from(orders));
+  const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
+  const { data: catalog } = useLiveQuery(db.select().from(items));
+  const { data: people } = useLiveQuery(db.select().from(persons));
+
+  const { aggregatedItems, peopleOrders } = useMemo(() => {
+    const agg: Record<string, { item: any; totalQuantity: number }> = {};
+    const pOrders: Record<string, { person: any; order: any; items: any[]; totalCost: number; unpaidCost: number }> = {};
+
+    if (!allOrders || !allOrderItems || !catalog || !people) {
+      return { aggregatedItems: [], peopleOrders: [] };
+    }
+
+    const targetDateDb = extractDateValue(targetDateSelection);
+    // JS-based filtering ensures perfect reactivity when targetDateSelection changes
+    const filteredOrders = allOrders.filter(o => o.targetDate === targetDateDb);
+
+    filteredOrders.forEach((order) => {
+      const person = people.find((p) => p.id === order.personId);
+      const itemsForOrder = allOrderItems.filter((oi) => oi.orderId === order.id);
+
+      let totalCost = 0;
+      let unpaidCost = 0;
+      const orderDetails = itemsForOrder.map((oi) => {
+        const itemDef = catalog.find((c) => c.id === oi.itemId);
+        const cost = (oi.unitPrice ?? 0) * oi.quantity;
+        totalCost += cost;
+        if (!oi.isPaid) unpaidCost += cost;
+
+        // Aggregate for shopping list
+        if (itemDef) {
+          if (!agg[itemDef.id]) {
+            agg[itemDef.id] = { item: itemDef, totalQuantity: 0 };
+          }
+          agg[itemDef.id].totalQuantity += oi.quantity;
+        }
+
+        return { ...oi, itemDef };
+      });
+
+      if (person) {
+        pOrders[person.id] = { person, order, items: orderDetails, totalCost, unpaidCost };
+      }
+    });
+
+    // Group aggregated items by timing then source
+    const groupedList = Object.values(agg).reduce((acc, curr) => {
+      const timing = curr.item.timing || 'Anytime';
+      const source = curr.item.source || 'Unknown';
+      if (!acc[timing]) acc[timing] = {};
+      if (!acc[timing][source]) acc[timing][source] = [];
+      acc[timing][source].push(curr);
+      return acc;
+    }, {} as Record<string, Record<string, typeof agg[string][]>>);
+
+    return {
+      aggregatedItems: groupedList,
+      peopleOrders: Object.values(pOrders),
+    };
+  }, [allOrders, allOrderItems, catalog, people, targetDateSelection]);
+
+  const toggleCheck = (itemId: string) => {
+    setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
+  };
+
+  const handleToggleItemPaid = async (itemId: string, personId: string, itemCost: number, isPaid: boolean) => {
+    try {
+      if (isPaid) {
+        await api.markItemUnpaid(itemId, personId, itemCost);
+      } else {
+        await api.markItemPaid(itemId, personId, itemCost);
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to update item status');
+    }
+  };
+
+  const handleMarkAllPaid = async (orderId: string, personId: string) => {
+    try {
+      await api.markOrderPaid(orderId, personId);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to mark order as paid');
+    }
+  };
+
+  const handleMarkAllUnpaid = async (orderId: string, personId: string) => {
+    try {
+      await api.markOrderUnpaid(orderId, personId);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to mark order as unpaid');
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Tab One</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/(tabs)/index.tsx" />
+      <View style={[styles.header, { zIndex: 10 }]}>
+        <Text style={styles.headerTitle}>Target Date:</Text>
+        <View style={{ flex: 1 }}>
+          <DropdownSelect
+            value={targetDateSelection}
+            options={dateOptions}
+            onSelect={setTargetDateSelection}
+            allowCustom
+            placeholder="Select Date"
+          />
+        </View>
+      </View>
+
+      <ScrollView style={styles.content}>
+        <Text style={styles.sectionTitle}>🛍️ The Shopping List</Text>
+        {Object.entries(aggregatedItems).map(([timing, sources]) => (
+          <View key={timing} style={styles.timingGroup}>
+            <Text style={styles.timingTitle}>{timing}</Text>
+            {Object.entries(sources).map(([source, itemsList]) => (
+              <View key={source} style={styles.sourceGroup}>
+                <Text style={styles.sourceTitle}>📍 {source}</Text>
+                {itemsList.map((ag) => (
+                  <TouchableOpacity
+                    key={ag.item.id}
+                    style={styles.itemRow}
+                    onPress={() => toggleCheck(ag.item.id)}>
+                    <FontAwesome
+                      name={checkedItems[ag.item.id] ? 'check-square-o' : 'square-o'}
+                      size={24}
+                      color={checkedItems[ag.item.id] ? '#28a745' : '#ccc'}
+                    />
+                    <Text
+                      style={[
+                        styles.itemText,
+                        checkedItems[ag.item.id] && styles.itemTextCrossed,
+                      ]}>
+                      {ag.totalQuantity}x {ag.item.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </View>
+        ))}
+
+        {Object.keys(aggregatedItems).length === 0 && (
+          <Text style={styles.emptyText}>No items to buy for this date.</Text>
+        )}
+
+        <View style={styles.separator} />
+
+        <Text style={styles.sectionTitle}>🚚 Deliveries & Payments</Text>
+        {peopleOrders.map((po) => (
+          <View key={po.person.id} style={styles.personCard}>
+            <View style={styles.personHeader}>
+              <Text style={styles.personName}>{po.person.name}</Text>
+              <View style={styles.costInfo}>
+                <Text style={styles.personTotal}>${po.totalCost.toFixed(2)}</Text>
+                {po.unpaidCost > 0 && (
+                  <Text style={styles.unpaidCost}>(${po.unpaidCost.toFixed(2)} unpaid)</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.personItems}>
+              {po.items.map((i) => {
+                const itemCost = (i.unitPrice ?? 0) * i.quantity;
+                return (
+                  <View key={i.id} style={styles.itemRow2}>
+                    <TouchableOpacity
+                      onPress={() => handleToggleItemPaid(i.id, po.person.id, itemCost, i.isPaid)}
+                      style={styles.itemToggle}>
+                      <FontAwesome
+                        name={i.isPaid ? 'check-square-o' : 'square-o'}
+                        size={18}
+                        color={i.isPaid ? '#28a745' : '#ccc'}
+                      />
+                    </TouchableOpacity>
+                    <View style={styles.itemInfo}>
+                      <Text style={[styles.personItemText, i.isPaid && styles.personItemPaid]}>
+                        {i.quantity}x {i.itemDef?.name} - ${itemCost.toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.personFooter}>
+              <View>
+                <Text style={[styles.balanceLabel, po.person.balance < 0 ? styles.debtLabel : styles.creditLabel]}>
+                  {po.person.balance < 0
+                    ? 'Your money with them: '
+                    : po.person.balance > 0
+                    ? 'Their money with you: '
+                    : 'Settled: '}
+                </Text>
+                <Text style={po.person.balance < 0 ? styles.debt : po.person.balance > 0 ? styles.credit : styles.settled}>
+                  ${Math.abs(po.person.balance).toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.buttonGroup}>
+                {po.unpaidCost > 0 ? (
+                  <TouchableOpacity
+                    style={styles.markAllPaidBtn}
+                    onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
+                    <Text style={styles.markAllPaidText}>Mark All Paid</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.markAllUnpaidBtn}
+                    onPress={() => handleMarkAllUnpaid(po.order.id, po.person.id)}>
+                    <Text style={styles.markAllUnpaidText}>Mark All Unpaid</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    padding: 15,
+    backgroundColor: '#222',
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
-  },
+  headerTitle: { fontSize: 16, color: '#fff', marginRight: 10 },
+  content: { padding: 15 },
+  sectionTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 15, color: '#fff' },
+  timingGroup: { marginBottom: 15 },
+  timingTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginBottom: 5 },
+  sourceGroup: { marginLeft: 10, marginBottom: 10 },
+  sourceTitle: { fontSize: 16, color: '#aaa', marginBottom: 5 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginLeft: 10 },
+  itemText: { fontSize: 18, color: '#fff', marginLeft: 10 },
+  itemTextCrossed: { textDecorationLine: 'line-through', color: '#666' },
+  emptyText: { color: '#888', fontStyle: 'italic', marginBottom: 20 },
+  separator: { height: 1, backgroundColor: '#444', marginVertical: 20 },
+  personCard: { backgroundColor: '#333', padding: 15, borderRadius: 10, marginBottom: 15 },
+  personHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  personName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  personTotal: { fontSize: 18, fontWeight: 'bold', color: '#ffeb3b' },
+  costInfo: { alignItems: 'flex-end' },
+  unpaidCost: { fontSize: 12, color: '#ff9800', fontWeight: 'bold' },
+  personItems: { marginBottom: 10 },
+  itemRow2: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  itemToggle: { padding: 8 },
+  itemInfo: { flex: 1 },
+  personItemText: { color: '#ccc', fontSize: 14 },
+  personItemPaid: { textDecorationLine: 'line-through', color: '#666' },
+  personFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#555', paddingTop: 10 },
+  balanceLabel: { fontSize: 12, fontWeight: '600', marginBottom: 3 },
+  debtLabel: { color: '#ff4444' },
+  creditLabel: { color: '#00C851' },
+  debt: { color: '#ff4444', fontWeight: 'bold', fontSize: 16 },
+  credit: { color: '#00C851', fontWeight: 'bold', fontSize: 16 },
+  settled: { color: '#aaa', fontWeight: 'bold', fontSize: 16 },
+  buttonGroup: { alignItems: 'flex-end' },
+  markAllPaidBtn: { backgroundColor: '#2f95dc', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
+  markAllPaidText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  markAllUnpaidBtn: { backgroundColor: '#444', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
+  markAllUnpaidText: { color: '#ccc', fontWeight: 'bold', fontSize: 13 },
+  markPaidBtn: { backgroundColor: '#2f95dc', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 5 },
+  markPaidText: { color: '#fff', fontWeight: 'bold' },
+  paidContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  paidText: { color: '#00C851', fontWeight: 'bold', fontSize: 16 },
+  markUnpaidBtn: { backgroundColor: '#444', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 5 },
+  markUnpaidText: { color: '#ccc', fontSize: 12 },
 });
