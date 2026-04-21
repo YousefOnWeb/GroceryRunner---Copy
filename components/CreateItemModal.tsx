@@ -68,10 +68,11 @@ export default function CreateItemModal({
 
   const handleSubmit = () => {
     const price = parseFloat(priceStr);
+    const finalSource = (sourceSearch.trim() || source.trim()) || null;
     onSubmit(
       name,
       isNaN(price) ? null : price,
-      source.trim() || null,
+      finalSource,
       timing
     );
   };

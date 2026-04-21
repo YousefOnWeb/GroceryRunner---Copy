@@ -57,7 +57,7 @@ export default function TheRunScreen() {
       });
 
       if (person) {
-        pOrders[person.id] = { person, order, items: orderDetails, totalCost, unpaidCost };
+        pOrders[person.id] = { person, order, items: orderDetails, totalCost, unpaidCost, deliveryPlace: order.deliveryPlace || person.typicalPlace };
       }
     });
 
@@ -169,7 +169,12 @@ export default function TheRunScreen() {
         {peopleOrders.map((po) => (
           <View key={po.person.id} style={styles.personCard}>
             <View style={styles.personHeader}>
-              <Text style={styles.personName}>{po.person.name}</Text>
+              <View>
+                <Text style={styles.personName}>{po.person.name}</Text>
+                {po.deliveryPlace ? (
+                  <Text style={styles.deliveryPlace}>📍 {po.deliveryPlace}</Text>
+                ) : null}
+              </View>
               <View style={styles.costInfo}>
                 <Text style={styles.personTotal}>${po.totalCost.toFixed(2)}</Text>
                 {po.unpaidCost > 0 && (
@@ -262,6 +267,7 @@ const styles = StyleSheet.create({
   personHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   personName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
   personTotal: { fontSize: 18, fontWeight: 'bold', color: '#ffeb3b' },
+  deliveryPlace: { fontSize: 12, color: '#8bb8e8', marginTop: 2 },
   costInfo: { alignItems: 'flex-end' },
   unpaidCost: { fontSize: 12, color: '#ff9800', fontWeight: 'bold' },
   personItems: { marginBottom: 10 },

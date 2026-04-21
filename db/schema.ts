@@ -4,6 +4,13 @@ export const persons = sqliteTable('persons', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   balance: real('balance').notNull().default(0),
+  typicalPlace: text('typicalPlace'),
+});
+
+export const personAliases = sqliteTable('personAliases', {
+  id: text('id').primaryKey(),
+  personId: text('personId').notNull().references(() => persons.id, { onDelete: 'cascade' }),
+  alias: text('alias').notNull(),
 });
 
 export const items = sqliteTable('items', {
@@ -19,6 +26,7 @@ export const orders = sqliteTable('orders', {
   personId: text('personId').notNull().references(() => persons.id),
   targetDate: text('targetDate').notNull(), // 'YYYY-MM-DD'
   isPaid: integer('isPaid', { mode: 'boolean' }).notNull().default(false),
+  deliveryPlace: text('deliveryPlace'),
 });
 
 export const orderItems = sqliteTable('orderItems', {

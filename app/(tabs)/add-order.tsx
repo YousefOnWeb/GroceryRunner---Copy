@@ -1,9 +1,10 @@
 import CreateItemModal from '@/components/CreateItemModal';
 import DropdownSelect from '@/components/DropdownSelect';
+import PersonModal from '@/components/PersonModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
-import { items, orderItems, orders, persons } from '@/db/schema';
+import { items, orderItems, orders, personAliases, persons } from '@/db/schema';
 import { extractDateValue, generateDateOptions } from '@/utils/dates';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -12,6 +13,7 @@ import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'reac
 
 export default function AddOrderScreen() {
   const { data: people } = useLiveQuery(db.select().from(persons));
+  const { data: allAliases } = useLiveQuery(db.select().from(personAliases));
   const { data: catalog } = useLiveQuery(db.select().from(items));
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
@@ -27,6 +29,12 @@ export default function AddOrderScreen() {
   // Person search state
   const [personSearchQuery, setPersonSearchQuery] = useState('');
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+
+  // Delivery place
+  const [deliveryPlace, setDeliveryPlace] = useState('');
+
+  // Create person modal
+  const [personModalVisible, setPersonModalVisible] = useState(false);
 
   const [editModeOrderId, setEditModeOrderId] = useState<string | null>(null);
 
@@ -46,6 +54,21 @@ export default function AddOrderScreen() {
     
     setCart(newCart);
     setEditModeOrderId(existingOrder.id);
+    // Load existing delivery place
+    if (existingOrder.deliveryPlace) {
+      setDeliveryPlace(existingOrder.deliveryPlace);
+    }
+  };
+
+  /** When a person is selected, auto-fill delivery place from their typical place */
+  const handleSelectPerson = (personId: string) => {
+    setSelectedPersonId(personId);
+    const person = people?.find(p => p.id === personId);
+    if (person?.typicalPlace) {
+      setDeliveryPlace(person.typicalPlace);
+    } else {
+      setDeliveryPlace('');
+    }
   };
 
   const addToCart = (itemObj: any) => {
@@ -98,10 +121,10 @@ export default function AddOrderScreen() {
           Alert.alert('Notice', 'Cart is empty. If you want to delete the order, you should delete it from the run tab (Feature coming soon).');
           return;
         }
-        await api.updateOrder(editModeOrderId, selectedPersonId, orderLines);
+        await api.updateOrder(editModeOrderId, selectedPersonId, orderLines, deliveryPlace || null);
         Alert.alert('Success', 'Order updated successfully (Note: all items have been reset to Unpaid)');
       } else {
-        await api.createOrder(selectedPersonId, targetDateDb, orderLines);
+        await api.createOrder(selectedPersonId, targetDateDb, orderLines, deliveryPlace || null);
         Alert.alert('Success', 'Order saved successfully');
       }
       
@@ -109,6 +132,7 @@ export default function AddOrderScreen() {
       setSelectedPersonId(null);
       setPersonSearchQuery('');
       setEditModeOrderId(null);
+      setDeliveryPlace('');
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to save order');
@@ -128,24 +152,53 @@ export default function AddOrderScreen() {
     }
   };
 
-  const handleCreatePerson = async () => {
-    if (!personSearchQuery.trim()) return;
-    try {
-      const res = await api.addPerson(personSearchQuery);
-      if (res && res.length > 0) {
-        setSelectedPersonId(res[0].id);
-        setPersonSearchQuery('');
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Failed to add person');
-    }
+  const handleCreatePersonDone = () => {
+    setPersonModalVisible(false);
+    // Person created — user can now find them in the search
   };
 
   const filteredCatalog = catalog?.filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase())) || [];
   const exactItemMatch = filteredCatalog.find(i => i.name.toLowerCase() === searchQuery.toLowerCase().trim());
 
-  const filteredPeople = people?.filter((p) => p.name.toLowerCase().includes(personSearchQuery.toLowerCase())) || [];
-  const exactPersonMatch = filteredPeople.find(p => p.name.toLowerCase() === personSearchQuery.toLowerCase().trim());
+  // Person search: match by primary name OR alias
+  const filteredPeople = useMemo(() => {
+    if (!people || !personSearchQuery.trim()) return people || [];
+    const q = personSearchQuery.toLowerCase().trim();
+
+    // Get person IDs that match by alias
+    const aliasMatchedIds = new Set(
+      allAliases
+        ?.filter(a => a.alias.toLowerCase().includes(q))
+        .map(a => a.personId) || []
+    );
+
+    return people.filter(p =>
+      p.name.toLowerCase().includes(q) || aliasMatchedIds.has(p.id)
+    );
+  }, [people, allAliases, personSearchQuery]);
+
+  const exactPersonMatch = useMemo(() => {
+    const q = personSearchQuery.toLowerCase().trim();
+    if (!q) return undefined;
+    // Exact match by primary name
+    const byName = people?.find(p => p.name.toLowerCase() === q);
+    if (byName) return byName;
+    // Exact match by alias → resolve to primary person
+    const aliasMatch = allAliases?.find(a => a.alias.toLowerCase() === q);
+    if (aliasMatch) return people?.find(p => p.id === aliasMatch.personId);
+    return undefined;
+  }, [people, allAliases, personSearchQuery]);
+
+  // Get alias that matched for display hint
+  const getMatchingAlias = (personId: string): string | null => {
+    if (!personSearchQuery.trim()) return null;
+    const q = personSearchQuery.toLowerCase().trim();
+    const person = people?.find(p => p.id === personId);
+    // Only show alias hint if the name itself doesn't match
+    if (person && person.name.toLowerCase().includes(q)) return null;
+    const match = allAliases?.find(a => a.personId === personId && a.alias.toLowerCase().includes(q));
+    return match?.alias || null;
+  };
 
   return (
     <View style={styles.container}>
@@ -160,7 +213,7 @@ export default function AddOrderScreen() {
               <Text style={styles.selectedText}>
                 {people?.find(p => p.id === selectedPersonId)?.name}
               </Text>
-              <TouchableOpacity onPress={() => { setSelectedPersonId(null); setEditModeOrderId(null); setCart([]); }} style={styles.changeBtn}>
+              <TouchableOpacity onPress={() => { setSelectedPersonId(null); setEditModeOrderId(null); setCart([]); setDeliveryPlace(''); }} style={styles.changeBtn}>
                 <Text style={styles.changeBtnText}>Change</Text>
               </TouchableOpacity>
             </View>
@@ -171,11 +224,11 @@ export default function AddOrderScreen() {
                   style={[styles.input, { flex: 1, marginBottom: 0 }]}
                   value={personSearchQuery}
                   onChangeText={setPersonSearchQuery}
-                  placeholder="Search person..."
+                  placeholder="Search person or nickname..."
                   placeholderTextColor="#888"
                 />
                 {personSearchQuery.trim().length > 0 && !exactPersonMatch && (
-                  <TouchableOpacity style={styles.addButton} onPress={handleCreatePerson}>
+                  <TouchableOpacity style={styles.addButton} onPress={() => setPersonModalVisible(true)}>
                     <Text style={styles.addButtonText}>Create "{personSearchQuery.trim()}"</Text>
                   </TouchableOpacity>
                 )}
@@ -183,11 +236,17 @@ export default function AddOrderScreen() {
 
               {filteredPeople.length > 0 && (
                 <View style={styles.grid}>
-                  {filteredPeople.slice(0, 8).map((p) => (
-                    <TouchableOpacity key={p.id} style={styles.gridItemPerson} onPress={() => setSelectedPersonId(p.id)}>
-                      <Text style={styles.gridItemName}>{p.name}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {filteredPeople.slice(0, 8).map((p) => {
+                    const matchedAlias = getMatchingAlias(p.id);
+                    return (
+                      <TouchableOpacity key={p.id} style={styles.gridItemPerson} onPress={() => handleSelectPerson(p.id)}>
+                        <Text style={styles.gridItemName}>{p.name}</Text>
+                        {matchedAlias && (
+                          <Text style={styles.gridItemAlias}>({matchedAlias})</Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
             </>
@@ -207,6 +266,20 @@ export default function AddOrderScreen() {
             />
           </View>
         </View>
+
+        {/* 2.5 Delivery Place */}
+        {selectedPersonId && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📍 Deliver to</Text>
+            <TextInput
+              style={styles.input}
+              value={deliveryPlace}
+              onChangeText={setDeliveryPlace}
+              placeholder="e.g. Building A, Floor 3"
+              placeholderTextColor="#888"
+            />
+          </View>
+        )}
 
         {/* Edit Mode Banner */}
         {existingOrder && editModeOrderId !== existingOrder.id && (
@@ -295,6 +368,17 @@ export default function AddOrderScreen() {
         onCancel={() => setItemModalVisible(false)}
         onSubmit={handleCreateItemSubmit}
       />
+
+      <PersonModal
+        visible={personModalVisible}
+        mode="create"
+        initialName={personSearchQuery}
+        onCancel={() => setPersonModalVisible(false)}
+        onDone={() => {
+          setPersonModalVisible(false);
+          setPersonSearchQuery('');
+        }}
+      />
     </View>
   );
 }
@@ -337,8 +421,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#444',
     padding: 10,
     borderRadius: 20,
+    alignItems: 'center',
   },
   gridItemName: { color: '#fff', textAlign: 'center' },
+  gridItemAlias: { color: '#8bb8e8', textAlign: 'center', fontSize: 11, fontStyle: 'italic', marginTop: 2 },
   badge: {
     position: 'absolute',
     top: -5,

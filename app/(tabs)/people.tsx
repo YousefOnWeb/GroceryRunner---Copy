@@ -1,52 +1,43 @@
-import PromptModal from '@/components/PromptModal';
+import PersonModal from '@/components/PersonModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
-import { persons } from '@/db/schema';
+import { personAliases, persons } from '@/db/schema';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import React, { useState } from 'react';
-import { Alert, Modal, View as RNView, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
-interface AdjustmentState {
+interface EditState {
   personId: string;
-  personName: string;
-  type: 'increase' | 'decrease' | null;
+  name: string;
+  typicalPlace: string | null;
+  aliases: string[];
+  balance: number;
 }
 
 export default function PeopleScreen() {
   const { data: peopleList } = useLiveQuery(db.select().from(persons));
-  const [promptVisible, setPromptVisible] = useState(false);
-  const [adjustmentState, setAdjustmentState] = useState<AdjustmentState>({
-    personId: '',
-    personName: '',
-    type: null,
-  });
-  const [typeModalVisible, setTypeModalVisible] = useState(false);
+  const { data: allAliases } = useLiveQuery(db.select().from(personAliases));
 
-  const handleChangePress = (personId: string, personName: string) => {
-    setAdjustmentState({ personId, personName, type: null });
-    setTypeModalVisible(true);
-  };
+  // Create person modal
+  const [createModalVisible, setCreateModalVisible] = useState(false);
 
-  const handleTypeSelect = (type: 'increase' | 'decrease') => {
-    setAdjustmentState((prev) => ({ ...prev, type }));
-    setTypeModalVisible(false);
-    setPromptVisible(true);
-  };
+  // Edit person modal
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
 
-  const handleAdjustmentSubmit = async (amountStr: string) => {
-    if (!adjustmentState.personId || !adjustmentState.type) return;
-    setPromptVisible(false);
-
-    const amount = parseFloat(amountStr || '0');
-    if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Error', 'Invalid amount');
-      return;
-    }
-
-    const finalAmount = adjustmentState.type === 'increase' ? amount : -amount;
-    await api.changeBalance(adjustmentState.personId, finalAmount);
-    Alert.alert('Success', 'Balance updated!');
+  const handleEditPress = (person: typeof peopleList extends (infer T)[] | undefined ? T : never) => {
+    if (!person) return;
+    const aliases = allAliases?.filter(a => a.personId === person.id).map(a => a.alias) || [];
+    setEditState({
+      personId: person.id,
+      name: person.name,
+      typicalPlace: person.typicalPlace,
+      aliases,
+      balance: person.balance,
+    });
+    setEditModalVisible(true);
   };
 
   const getBalanceLabel = (balance: number) => {
@@ -65,66 +56,73 @@ export default function PeopleScreen() {
     return '#aaa';
   };
 
+  const getAliasesForPerson = (personId: string) => {
+    return allAliases?.filter(a => a.personId === personId).map(a => a.alias) || [];
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Colleagues & Balances</Text>
-        
-        {peopleList?.map((person) => (
-          <View key={person.id} style={styles.card}>
-            <View style={styles.info}>
-              <Text style={styles.name}>{person.name}</Text>
-              <Text style={[styles.balance, { color: getBalanceColor(person.balance) }]}>
-                {getBalanceLabel(person.balance)}
-              </Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Colleagues & Balances</Text>
+          <TouchableOpacity style={styles.addBtn} onPress={() => setCreateModalVisible(true)}>
+            <FontAwesome name="plus" size={16} color="#fff" />
+            <Text style={styles.addBtnText}>Add Person</Text>
+          </TouchableOpacity>
+        </View>
+
+        {peopleList?.map((person) => {
+          const aliases = getAliasesForPerson(person.id);
+          return (
+            <View key={person.id} style={styles.card}>
+              <View style={styles.info}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.name}>{person.name}</Text>
+                  <TouchableOpacity onPress={() => handleEditPress(person)} style={styles.editBtn}>
+                    <FontAwesome name="pencil" size={18} color="#2f95dc" />
+                  </TouchableOpacity>
+                </View>
+                {person.typicalPlace ? (
+                  <Text style={styles.place}>📍 {person.typicalPlace}</Text>
+                ) : null}
+                {aliases.length > 0 ? (
+                  <Text style={styles.aliases}>
+                    aka: {aliases.join(', ')}
+                  </Text>
+                ) : null}
+                <Text style={[styles.balance, { color: getBalanceColor(person.balance) }]}>
+                  {getBalanceLabel(person.balance)}
+                </Text>
+              </View>
             </View>
-            <TouchableOpacity
-              style={styles.btn}
-              onPress={() => handleChangePress(person.id, person.name)}>
-              <Text style={styles.btnText}>Change Manually</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
+          );
+        })}
 
         {peopleList?.length === 0 && (
-          <Text style={styles.emptyText}>No people added yet. Add them when creating an order.</Text>
+          <Text style={styles.emptyText}>No people added yet. Tap "Add Person" or add them when creating an order.</Text>
         )}
       </ScrollView>
 
-      <Modal visible={typeModalVisible} transparent animationType="fade">
-        <RNView style={styles.overlay}>
-          <View style={styles.typeDialog}>
-            <Text style={styles.typeTitle}>What do you want to do?</Text>
-            <TouchableOpacity
-              style={styles.typeOption}
-              onPress={() => handleTypeSelect('increase')}>
-              <Text style={styles.typeOptionText}>Increase their credit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeOption, styles.typeOptionDanger]}
-              onPress={() => handleTypeSelect('decrease')}>
-              <Text style={styles.typeOptionText}>Decrease their credit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.typeCancel}
-              onPress={() => setTypeModalVisible(false)}>
-              <Text style={styles.typeCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </RNView>
-      </Modal>
+      {/* Create Person Modal */}
+      <PersonModal
+        visible={createModalVisible}
+        mode="create"
+        onCancel={() => setCreateModalVisible(false)}
+        onDone={() => setCreateModalVisible(false)}
+      />
 
-      {adjustmentState.type && (
-        <PromptModal
-          visible={promptVisible}
-          title="Adjust Balance"
-          message={`Person: ${adjustmentState.personName}\nAction: ${
-            adjustmentState.type === 'increase' ? 'Increase' : 'Decrease'
-          } their credit\n\nEnter amount:`}
-          placeholder="e.g. 50"
-          keyboardType="numeric"
-          onCancel={() => setPromptVisible(false)}
-          onSubmit={handleAdjustmentSubmit}
+      {/* Edit Person Modal */}
+      {editState && (
+        <PersonModal
+          visible={editModalVisible}
+          mode="edit"
+          personId={editState.personId}
+          initialName={editState.name}
+          initialPlace={editState.typicalPlace}
+          initialAliases={editState.aliases}
+          initialBalance={editState.balance}
+          onCancel={() => { setEditModalVisible(false); setEditState(null); }}
+          onDone={() => { setEditModalVisible(false); setEditState(null); }}
         />
       )}
     </View>
@@ -134,71 +132,51 @@ export default function PeopleScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 15 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: '#fff' },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2f95dc',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  addBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   card: {
     backgroundColor: '#333',
     padding: 15,
     borderRadius: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 10,
   },
   info: { flex: 1 },
-  name: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 5 },
-  balance: { fontSize: 14, fontWeight: '600' },
-  btn: { backgroundColor: '#2f95dc', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 8 },
-  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  nameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  name: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  editBtn: {
+    padding: 6,
+  },
+  place: {
+    fontSize: 13,
+    color: '#8bb8e8',
+    marginBottom: 3,
+  },
+  aliases: {
+    fontSize: 12,
+    color: '#888',
+    fontStyle: 'italic',
+    marginBottom: 3,
+  },
+  balance: { fontSize: 14, fontWeight: '600', marginTop: 2 },
   emptyText: { color: '#888', fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  typeDialog: {
-    backgroundColor: '#222',
-    borderRadius: 12,
-    padding: 20,
-    width: '100%',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  typeTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  typeOption: {
-    backgroundColor: '#2f95dc',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  typeOptionDanger: {
-    backgroundColor: '#d9534f',
-  },
-  typeOptionText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  typeCancel: {
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  typeCancelText: {
-    color: '#aaa',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
 });
