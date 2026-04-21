@@ -117,7 +117,7 @@ export default function PeopleScreen() {
                     <TouchableOpacity
                       onPress={() => setUnknownPricePerson({ id: person.id, name: person.name })}
                       style={styles.notesBtn}>
-                      <FontAwesome name="sticky-note-o" size={16} color="#ff9800" />
+                      <FontAwesome name="exclamation-circle" size={18} color="#ff9800" />
                     </TouchableOpacity>
                   )}
                 </View>

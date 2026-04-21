@@ -9,7 +9,7 @@ import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 
 export default function TheRunScreen() {
   const dateOptions = useMemo(() => generateDateOptions(30), []);
@@ -17,6 +17,7 @@ export default function TheRunScreen() {
   const [targetDateSelection, setTargetDateSelection] = useState(dateOptions[1]);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [paidItems, setPaidItems] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Unknown price notes modal
   const [unknownPricePerson, setUnknownPricePerson] = useState<{ id: string; name: string } | null>(null);
@@ -167,7 +168,11 @@ export default function TheRunScreen() {
     Object.values(aggregatedItems).some(sources => Object.keys(sources).length > 0);
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+    >
       <View style={[styles.header, { zIndex: 10 }]}>
         <Text style={styles.headerTitle}>Target Date:</Text>
         <View style={{ flex: 1 }}>
@@ -236,8 +241,25 @@ export default function TheRunScreen() {
 
         <View style={styles.separator} />
 
-        <Text style={styles.sectionTitle}>🚚 Deliveries & Payments</Text>
-        {peopleOrders.map((po) => (
+        <View style={styles.deliveriesHeader}>
+          <Text style={styles.sectionTitle}>🚚 Deliveries & Payments</Text>
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search person or location..."
+            placeholderTextColor="#888"
+          />
+        </View>
+
+        {peopleOrders
+          .filter(po => {
+            const q = searchQuery.toLowerCase().trim();
+            if (!q) return true;
+            return po.person.name.toLowerCase().includes(q) || 
+                   (po.deliveryPlace && po.deliveryPlace.toLowerCase().includes(q));
+          })
+          .map((po) => (
           <View key={po.person.id} style={styles.personCard}>
             <View style={styles.personHeader}>
               <View>
@@ -301,7 +323,7 @@ export default function TheRunScreen() {
                     <TouchableOpacity
                       onPress={() => setUnknownPricePerson({ id: po.person.id, name: po.person.name })}
                       style={styles.notesBtn}>
-                      <FontAwesome name="sticky-note-o" size={14} color="#ff9800" />
+                      <FontAwesome name="exclamation-circle" size={18} color="#ff9800" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -338,7 +360,7 @@ export default function TheRunScreen() {
           onClose={() => setUnknownPricePerson(null)}
         />
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -352,7 +374,19 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 16, color: '#fff', marginRight: 10 },
   content: { padding: 15 },
-  sectionTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 15, color: '#fff' },
+  deliveriesHeader: {
+    marginBottom: 15,
+  },
+  sectionTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 10 },
+  searchInput: {
+    backgroundColor: '#333',
+    color: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    fontSize: 16,
+    width: '100%',
+  },
   timingGroup: { marginBottom: 15 },
   timingTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginBottom: 5 },
   sourceGroup: { marginLeft: 10, marginBottom: 12 },
