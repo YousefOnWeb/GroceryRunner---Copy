@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { persons, items, orderItems, orders } from '@/db/schema';
 import { api } from '@/db/api';
 import CreateItemModal from '@/components/CreateItemModal';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 export default function StatsScreen() {
   const { data: peopleList } = useLiveQuery(db.select().from(persons));
@@ -68,6 +69,28 @@ export default function StatsScreen() {
     setEditingItem(null);
   };
 
+  const handleDeleteItem = (item: any) => {
+    Alert.alert(
+      'Delete Item',
+      `Are you sure you want to delete "${item.name}"? This will not delete orders containing this item, but they might show incorrect information.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.deleteItem(item.id);
+            } catch (e) {
+              console.error(e);
+              Alert.alert('Error', 'Failed to delete item.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -101,9 +124,14 @@ export default function StatsScreen() {
           <View key={item.id} style={styles.itemCard}>
             <View style={styles.itemHeader}>
               <Text style={styles.itemName}>{item.name}</Text>
-              <TouchableOpacity onPress={() => handleEditClick(item)}>
-                <Text style={styles.editBtn}>Edit</Text>
-              </TouchableOpacity>
+              <View style={styles.actionButtons}>
+                <TouchableOpacity onPress={() => handleEditClick(item)} style={styles.iconBtn}>
+                  <FontAwesome name="pencil" size={18} color="#2f95dc" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDeleteItem(item)} style={styles.iconBtn}>
+                  <FontAwesome name="trash" size={18} color="#ff4444" />
+                </TouchableOpacity>
+              </View>
             </View>
             
             <View style={styles.itemDetails}>
@@ -147,7 +175,8 @@ const styles = StyleSheet.create({
   itemCard: { backgroundColor: '#222', padding: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#444' },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   itemName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  editBtn: { color: '#2f95dc', fontWeight: 'bold', padding: 5 },
+  actionButtons: { flexDirection: 'row', gap: 15 },
+  iconBtn: { padding: 5 },
   itemDetails: { gap: 5 },
   detailText: { color: '#ccc' },
 });

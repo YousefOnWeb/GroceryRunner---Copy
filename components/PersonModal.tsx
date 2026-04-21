@@ -120,6 +120,30 @@ export default function PersonModal({
     }
   };
 
+  const handleDelete = () => {
+    if (!personId) return;
+    Alert.alert(
+      'Delete Person',
+      `Are you sure you want to delete ${initialName}? This will also delete all their orders and transaction history.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.deletePerson(personId);
+              onDone();
+            } catch (e) {
+              console.error(e);
+              Alert.alert('Error', 'Failed to delete person.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
@@ -235,6 +259,13 @@ export default function PersonModal({
 
           {/* Action Buttons */}
           <View style={styles.buttonRow}>
+            {mode === 'edit' && (
+              <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+                <FontAwesome name="trash" size={18} color="#ff4444" />
+                <Text style={styles.deleteBtnText}>Delete</Text>
+              </TouchableOpacity>
+            )}
+            <View style={{ flex: 1 }} />
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
@@ -380,8 +411,20 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'center',
     gap: 10,
     marginTop: 20,
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  deleteBtnText: {
+    color: '#ff4444',
+    fontSize: 16,
+    fontWeight: '600',
   },
   cancelBtn: {
     paddingVertical: 10,

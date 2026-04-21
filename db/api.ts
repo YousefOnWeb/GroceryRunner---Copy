@@ -386,4 +386,41 @@ export const api = {
       .where(sql`${persons.typicalPlace} IS NOT NULL AND ${persons.typicalPlace} != ''`);
     return rows.map(r => r.typicalPlace).filter((s): s is string => s !== null);
   },
+
+  deletePerson: async (id: string) => {
+    await db.delete(transactions).where(eq(transactions.personId, id));
+    const personOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.personId, id));
+    for (const order of personOrders) {
+      await api.deleteOrder(order.id);
+    }
+    await db.delete(persons).where(eq(persons.id, id));
+  },
+
+  deleteItem: async (id: string) => {
+    // Check if item is used in any orders first? Or just delete?
+    // Let's just delete, foreign keys might block if not handled.
+    await db.delete(items).where(eq(items.id, id));
+  },
+
+  deleteOrder: async (orderId: string) => {
+    // orderItems will be deleted by cascade
+    await db.delete(orders).where(eq(orders.id, orderId));
+  },
+
+  getUnpaidUnknownPriceItems: async (personId: string) => {
+    const rows = await db.select({
+      itemName: items.name,
+      quantity: orderItems.quantity,
+      orderDate: orders.targetDate,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .innerJoin(items, eq(orderItems.itemId, items.id))
+    .where(and(
+      eq(orders.personId, personId),
+      eq(orderItems.isPaid, false),
+      sql`${orderItems.unitPrice} IS NULL`
+    ));
+    return rows;
+  },
 };

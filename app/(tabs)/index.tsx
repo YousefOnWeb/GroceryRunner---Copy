@@ -1,4 +1,5 @@
 import DropdownSelect from '@/components/DropdownSelect';
+import UnknownPriceModal from '@/components/UnknownPriceModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
@@ -16,6 +17,9 @@ export default function TheRunScreen() {
   const [targetDateSelection, setTargetDateSelection] = useState(dateOptions[1]);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [paidItems, setPaidItems] = useState<Record<string, boolean>>({});
+
+  // Unknown price notes modal
+  const [unknownPricePerson, setUnknownPricePerson] = useState<{ id: string; name: string } | null>(null);
 
   const { settings } = useSettings();
 
@@ -132,6 +136,28 @@ export default function TheRunScreen() {
     }
   };
 
+  const handleDeleteOrder = (orderId: string, personName: string) => {
+    Alert.alert(
+      'Delete Order',
+      `Are you sure you want to delete the order for ${personName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.deleteOrder(orderId);
+            } catch (e) {
+              console.error(e);
+              Alert.alert('Error', 'Failed to delete order');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   /** Calculate total cost for all items in a source group */
   const getSourceTotal = (itemsList: { totalCost: number }[]) => {
     return itemsList.reduce((sum, ag) => sum + ag.totalCost, 0);
@@ -221,7 +247,12 @@ export default function TheRunScreen() {
                 ) : null}
               </View>
               <View style={styles.costInfo}>
-                <Text style={styles.personTotal}>${po.totalCost.toFixed(2)}</Text>
+                <View style={styles.orderActions}>
+                  <TouchableOpacity onPress={() => handleDeleteOrder(po.order.id, po.person.name)} style={styles.deleteOrderBtn}>
+                    <FontAwesome name="trash" size={16} color="#ff4444" />
+                  </TouchableOpacity>
+                  <Text style={styles.personTotal}>${po.totalCost.toFixed(2)}</Text>
+                </View>
                 {po.unpaidCost > 0 && (
                   <Text style={styles.unpaidCost}>(${po.unpaidCost.toFixed(2)} unpaid)</Text>
                 )}
@@ -254,13 +285,26 @@ export default function TheRunScreen() {
 
             <View style={styles.personFooter}>
               <View>
-                <Text style={[styles.balanceLabel, po.person.balance < 0 ? styles.debtLabel : styles.creditLabel]}>
-                  {po.person.balance < 0
-                    ? 'Your money with them: '
-                    : po.person.balance > 0
-                    ? 'Their money with you: '
-                    : 'Settled: '}
-                </Text>
+                <View style={styles.balanceHeaderRow}>
+                  <Text style={[styles.balanceLabel, po.person.balance < 0 ? styles.debtLabel : styles.creditLabel]}>
+                    {po.person.balance < 0
+                      ? 'Your money with them: '
+                      : po.person.balance > 0
+                      ? 'Their money with you: '
+                      : 'Settled: '}
+                  </Text>
+                  {/* Notes icon for unknown prices */}
+                  {allOrderItems?.some(oi => {
+                    const order = allOrders?.find(o => o.id === oi.orderId);
+                    return order?.personId === po.person.id && !oi.isPaid && oi.unitPrice === null;
+                  }) && (
+                    <TouchableOpacity
+                      onPress={() => setUnknownPricePerson({ id: po.person.id, name: po.person.name })}
+                      style={styles.notesBtn}>
+                      <FontAwesome name="sticky-note-o" size={14} color="#ff9800" />
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <Text style={po.person.balance < 0 ? styles.debt : po.person.balance > 0 ? styles.credit : styles.settled}>
                   ${Math.abs(po.person.balance).toFixed(2)}
                 </Text>
@@ -284,6 +328,16 @@ export default function TheRunScreen() {
           </View>
         ))}
       </ScrollView>
+
+      {/* Unknown Price Notes Modal */}
+      {unknownPricePerson && (
+        <UnknownPriceModal
+          visible={!!unknownPricePerson}
+          personId={unknownPricePerson.id}
+          personName={unknownPricePerson.name}
+          onClose={() => setUnknownPricePerson(null)}
+        />
+      )}
     </View>
   );
 }
@@ -322,6 +376,8 @@ const styles = StyleSheet.create({
   personTotal: { fontSize: 18, fontWeight: 'bold', color: '#ffeb3b' },
   deliveryPlace: { fontSize: 12, color: '#8bb8e8', marginTop: 2 },
   costInfo: { alignItems: 'flex-end' },
+  orderActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  deleteOrderBtn: { padding: 4 },
   unpaidCost: { fontSize: 12, color: '#ff9800', fontWeight: 'bold' },
   personItems: { marginBottom: 10 },
   itemRow2: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
@@ -330,7 +386,9 @@ const styles = StyleSheet.create({
   personItemText: { color: '#ccc', fontSize: 14 },
   personItemPaid: { textDecorationLine: 'line-through', color: '#666' },
   personFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#555', paddingTop: 10 },
+  balanceHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   balanceLabel: { fontSize: 12, fontWeight: '600', marginBottom: 3 },
+  notesBtn: { padding: 4 },
   debtLabel: { color: '#ff4444' },
   creditLabel: { color: '#00C851' },
   debt: { color: '#ff4444', fontWeight: 'bold', fontSize: 16 },

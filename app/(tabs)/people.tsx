@@ -1,11 +1,13 @@
 import PersonModal from '@/components/PersonModal';
+import UnknownPriceModal from '@/components/UnknownPriceModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
-import { personAliases, persons } from '@/db/schema';
+import { orderItems, orders, personAliases, persons } from '@/db/schema';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { and, eq, sql } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 interface EditState {
@@ -26,6 +28,23 @@ export default function PeopleScreen() {
   // Edit person modal
   const [editState, setEditState] = useState<EditState | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
+
+  // Unknown price notes modal
+  const [unknownPricePerson, setUnknownPricePerson] = useState<{ id: string; name: string } | null>(null);
+
+  const { data: unpaidUnknownPriceItems } = useLiveQuery(
+    db.select({ personId: orders.personId })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(and(
+        eq(orderItems.isPaid, false),
+        sql`${orderItems.unitPrice} IS NULL`
+      ))
+  );
+
+  const peopleWithUnknownPrices = useMemo(() => {
+    return new Set(unpaidUnknownPriceItems?.map(i => i.personId) || []);
+  }, [unpaidUnknownPriceItems]);
 
   const handleEditPress = (person: typeof peopleList extends (infer T)[] | undefined ? T : never) => {
     if (!person) return;
@@ -90,9 +109,18 @@ export default function PeopleScreen() {
                     aka: {aliases.join(', ')}
                   </Text>
                 ) : null}
-                <Text style={[styles.balance, { color: getBalanceColor(person.balance) }]}>
-                  {getBalanceLabel(person.balance)}
-                </Text>
+                <View style={styles.balanceRow}>
+                  <Text style={[styles.balance, { color: getBalanceColor(person.balance) }]}>
+                    {getBalanceLabel(person.balance)}
+                  </Text>
+                  {peopleWithUnknownPrices.has(person.id) && (
+                    <TouchableOpacity
+                      onPress={() => setUnknownPricePerson({ id: person.id, name: person.name })}
+                      style={styles.notesBtn}>
+                      <FontAwesome name="sticky-note-o" size={16} color="#ff9800" />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             </View>
           );
@@ -123,6 +151,15 @@ export default function PeopleScreen() {
           initialBalance={editState.balance}
           onCancel={() => { setEditModalVisible(false); setEditState(null); }}
           onDone={() => { setEditModalVisible(false); setEditState(null); }}
+        />
+      )}
+      {/* Unknown Price Notes Modal */}
+      {unknownPricePerson && (
+        <UnknownPriceModal
+          visible={!!unknownPricePerson}
+          personId={unknownPricePerson.id}
+          personName={unknownPricePerson.name}
+          onClose={() => setUnknownPricePerson(null)}
         />
       )}
     </View>
@@ -177,6 +214,15 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: 3,
   },
-  balance: { fontSize: 14, fontWeight: '600', marginTop: 2 },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 2,
+  },
+  balance: { fontSize: 14, fontWeight: '600' },
+  notesBtn: {
+    padding: 4,
+  },
   emptyText: { color: '#888', fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
 });
