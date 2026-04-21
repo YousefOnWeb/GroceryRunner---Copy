@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { api } from '@/db/api';
 import { items, orderItems, orders, persons } from '@/db/schema';
 import { extractDateValue, generateDateOptions } from '@/utils/dates';
+import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
@@ -16,17 +17,19 @@ export default function TheRunScreen() {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [paidItems, setPaidItems] = useState<Record<string, boolean>>({});
 
+  const { settings } = useSettings();
+
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
   const { data: catalog } = useLiveQuery(db.select().from(items));
   const { data: people } = useLiveQuery(db.select().from(persons));
 
   const { aggregatedItems, peopleOrders } = useMemo(() => {
-    const agg: Record<string, { item: any; totalQuantity: number }> = {};
+    const agg: Record<string, { item: any; totalQuantity: number; totalCost: number }> = {};
     const pOrders: Record<string, { person: any; order: any; items: any[]; totalCost: number; unpaidCost: number }> = {};
 
     if (!allOrders || !allOrderItems || !catalog || !people) {
-      return { aggregatedItems: [], peopleOrders: [] };
+      return { aggregatedItems: {}, peopleOrders: [] };
     }
 
     const targetDateDb = extractDateValue(targetDateSelection);
@@ -48,9 +51,10 @@ export default function TheRunScreen() {
         // Aggregate for shopping list
         if (itemDef) {
           if (!agg[itemDef.id]) {
-            agg[itemDef.id] = { item: itemDef, totalQuantity: 0 };
+            agg[itemDef.id] = { item: itemDef, totalQuantity: 0, totalCost: 0 };
           }
           agg[itemDef.id].totalQuantity += oi.quantity;
+          agg[itemDef.id].totalCost += cost;
         }
 
         return { ...oi, itemDef };
@@ -61,21 +65,37 @@ export default function TheRunScreen() {
       }
     });
 
-    // Group aggregated items by timing then source
-    const groupedList = Object.values(agg).reduce((acc, curr) => {
-      const timing = curr.item.timing || 'Anytime';
-      const source = curr.item.source || 'Unknown';
-      if (!acc[timing]) acc[timing] = {};
-      if (!acc[timing][source]) acc[timing][source] = [];
-      acc[timing][source].push(curr);
-      return acc;
-    }, {} as Record<string, Record<string, typeof agg[string][]>>);
+    // Group aggregated items based on groupByFreshness setting
+    type AggItem = typeof agg[string];
+    let groupedList: Record<string, Record<string, AggItem[]>>;
+
+    if (settings.groupByFreshness) {
+      // Group by timing → source
+      groupedList = Object.values(agg).reduce((acc, curr) => {
+        const timing = curr.item.timing || 'Anytime';
+        const source = curr.item.source || 'Unknown';
+        if (!acc[timing]) acc[timing] = {};
+        if (!acc[timing][source]) acc[timing][source] = [];
+        acc[timing][source].push(curr);
+        return acc;
+      }, {} as Record<string, Record<string, AggItem[]>>);
+    } else {
+      // Group by source only (single top-level group)
+      const bySource = Object.values(agg).reduce((acc, curr) => {
+        const source = curr.item.source || 'Unknown';
+        if (!acc[source]) acc[source] = [];
+        acc[source].push(curr);
+        return acc;
+      }, {} as Record<string, AggItem[]>);
+      // Wrap in a single key so the rendering logic stays consistent
+      groupedList = { _all: bySource };
+    }
 
     return {
       aggregatedItems: groupedList,
       peopleOrders: Object.values(pOrders),
     };
-  }, [allOrders, allOrderItems, catalog, people, targetDateSelection]);
+  }, [allOrders, allOrderItems, catalog, people, targetDateSelection, settings.groupByFreshness]);
 
   const toggleCheck = (itemId: string) => {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
@@ -112,6 +132,14 @@ export default function TheRunScreen() {
     }
   };
 
+  /** Calculate total cost for all items in a source group */
+  const getSourceTotal = (itemsList: { totalCost: number }[]) => {
+    return itemsList.reduce((sum, ag) => sum + ag.totalCost, 0);
+  };
+
+  const hasItems = Object.keys(aggregatedItems).length > 0 &&
+    Object.values(aggregatedItems).some(sources => Object.keys(sources).length > 0);
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { zIndex: 10 }]}>
@@ -129,37 +157,54 @@ export default function TheRunScreen() {
 
       <ScrollView style={styles.content}>
         <Text style={styles.sectionTitle}>🛍️ The Shopping List</Text>
-        {Object.entries(aggregatedItems).map(([timing, sources]) => (
-          <View key={timing} style={styles.timingGroup}>
-            <Text style={styles.timingTitle}>{timing}</Text>
-            {Object.entries(sources).map(([source, itemsList]) => (
-              <View key={source} style={styles.sourceGroup}>
-                <Text style={styles.sourceTitle}>📍 {source}</Text>
-                {itemsList.map((ag) => (
-                  <TouchableOpacity
-                    key={ag.item.id}
-                    style={styles.itemRow}
-                    onPress={() => toggleCheck(ag.item.id)}>
-                    <FontAwesome
-                      name={checkedItems[ag.item.id] ? 'check-square-o' : 'square-o'}
-                      size={24}
-                      color={checkedItems[ag.item.id] ? '#28a745' : '#ccc'}
-                    />
-                    <Text
-                      style={[
-                        styles.itemText,
-                        checkedItems[ag.item.id] && styles.itemTextCrossed,
-                      ]}>
-                      {ag.totalQuantity}x {ag.item.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))}
+        {Object.entries(aggregatedItems).map(([timingKey, sources]) => (
+          <View key={timingKey} style={styles.timingGroup}>
+            {/* Only show timing header if groupByFreshness is on */}
+            {settings.groupByFreshness && timingKey !== '_all' && (
+              <Text style={styles.timingTitle}>{timingKey}</Text>
+            )}
+            {Object.entries(sources).map(([source, itemsList]) => {
+              const sourceTotal = getSourceTotal(itemsList);
+              return (
+                <View key={source} style={styles.sourceGroup}>
+                  <View style={styles.sourceHeader}>
+                    <Text style={styles.sourceTitle}>📍 {source}</Text>
+                    <Text style={styles.sourceCost}>${sourceTotal.toFixed(2)}</Text>
+                  </View>
+                  {itemsList.map((ag) => (
+                    <TouchableOpacity
+                      key={ag.item.id}
+                      style={styles.itemRow}
+                      onPress={() => toggleCheck(ag.item.id)}>
+                      <FontAwesome
+                        name={checkedItems[ag.item.id] ? 'check-square-o' : 'square-o'}
+                        size={24}
+                        color={checkedItems[ag.item.id] ? '#28a745' : '#ccc'}
+                      />
+                      <Text
+                        style={[
+                          styles.itemText,
+                          checkedItems[ag.item.id] && styles.itemTextCrossed,
+                        ]}>
+                        {ag.totalQuantity}x {ag.item.name}
+                      </Text>
+                      {ag.totalCost > 0 && (
+                        <Text style={[
+                          styles.itemPrice,
+                          checkedItems[ag.item.id] && styles.itemTextCrossed,
+                        ]}>
+                          ${ag.totalCost.toFixed(2)}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              );
+            })}
           </View>
         ))}
 
-        {Object.keys(aggregatedItems).length === 0 && (
+        {!hasItems && (
           <Text style={styles.emptyText}>No items to buy for this date.</Text>
         )}
 
@@ -256,10 +301,18 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 15, color: '#fff' },
   timingGroup: { marginBottom: 15 },
   timingTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginBottom: 5 },
-  sourceGroup: { marginLeft: 10, marginBottom: 10 },
-  sourceTitle: { fontSize: 16, color: '#aaa', marginBottom: 5 },
+  sourceGroup: { marginLeft: 10, marginBottom: 12 },
+  sourceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  sourceTitle: { fontSize: 16, color: '#aaa' },
+  sourceCost: { fontSize: 16, fontWeight: 'bold', color: '#ffeb3b' },
   itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginLeft: 10 },
-  itemText: { fontSize: 18, color: '#fff', marginLeft: 10 },
+  itemText: { fontSize: 18, color: '#fff', marginLeft: 10, flex: 1 },
+  itemPrice: { fontSize: 14, color: '#aaa', marginLeft: 8 },
   itemTextCrossed: { textDecorationLine: 'line-through', color: '#666' },
   emptyText: { color: '#888', fontStyle: 'italic', marginBottom: 20 },
   separator: { height: 1, backgroundColor: '#444', marginVertical: 20 },
@@ -288,10 +341,4 @@ const styles = StyleSheet.create({
   markAllPaidText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
   markAllUnpaidBtn: { backgroundColor: '#444', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
   markAllUnpaidText: { color: '#ccc', fontWeight: 'bold', fontSize: 13 },
-  markPaidBtn: { backgroundColor: '#2f95dc', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 5 },
-  markPaidText: { color: '#fff', fontWeight: 'bold' },
-  paidContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  paidText: { color: '#00C851', fontWeight: 'bold', fontSize: 16 },
-  markUnpaidBtn: { backgroundColor: '#444', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 5 },
-  markUnpaidText: { color: '#ccc', fontSize: 12 },
 });
