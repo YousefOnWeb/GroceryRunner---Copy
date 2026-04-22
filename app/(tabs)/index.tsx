@@ -22,6 +22,10 @@ export default function TheRunScreen() {
   // Unknown price notes modal
   const [unknownPricePerson, setUnknownPricePerson] = useState<{ id: string; name: string } | null>(null);
 
+  // Collapsible states
+  const [collapsedSources, setCollapsedSources] = useState<Record<string, boolean>>({});
+  const [collapsedLocations, setCollapsedLocations] = useState<Record<string, boolean>>({});
+
   const { settings } = useSettings();
 
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
@@ -206,6 +210,14 @@ export default function TheRunScreen() {
     return itemsList.reduce((sum, ag) => sum + ag.totalCost, 0);
   };
 
+  const toggleSourceCollapse = (sourceKey: string) => {
+    setCollapsedSources(prev => ({ ...prev, [sourceKey]: !prev[sourceKey] }));
+  };
+
+  const toggleLocationCollapse = (locKey: string) => {
+    setCollapsedLocations(prev => ({ ...prev, [locKey]: !prev[locKey] }));
+  };
+
   const hasItems = Object.keys(aggregatedItems).length > 0 &&
     Object.values(aggregatedItems).some(sources => Object.keys(sources).length > 0);
 
@@ -238,13 +250,28 @@ export default function TheRunScreen() {
             )}
             {Object.entries(sources).map(([source, itemsList]) => {
               const sourceTotal = getSourceTotal(itemsList);
+              const sourceKey = `${timingKey}-${source}`;
+              const isCollapsed = collapsedSources[sourceKey];
+              
               return (
                 <View key={source} style={styles.sourceGroup}>
-                  <View style={styles.sourceHeader}>
-                    <Text style={styles.sourceTitle}>📍 {source}</Text>
+                  <TouchableOpacity 
+                    style={styles.sourceHeader} 
+                    onPress={() => toggleSourceCollapse(sourceKey)}
+                    activeOpacity={0.7}>
+                    <View style={styles.sourceTitleRow}>
+                      <FontAwesome 
+                        name={isCollapsed ? 'caret-right' : 'caret-down'} 
+                        size={16} 
+                        color="#888" 
+                        style={{ width: 15 }} 
+                      />
+                      <Text style={styles.sourceTitle}>📍 {source}</Text>
+                    </View>
                     <Text style={styles.sourceCost}>${sourceTotal.toFixed(2)}</Text>
-                  </View>
-                  {itemsList.map((ag) => (
+                  </TouchableOpacity>
+                  
+                  {!isCollapsed && itemsList.map((ag) => (
                     <TouchableOpacity
                       key={ag.item.id}
                       style={styles.itemRow}
@@ -295,18 +322,32 @@ export default function TheRunScreen() {
         </View>
 
         {peopleOrders
-          .map((group) => (
-          <View key={group.location} style={styles.locationGroup}>
-            <Text style={styles.deliveryLocationTitle}>📍 {group.location}</Text>
-            {group.orders
-              .filter(po => {
-                const q = searchQuery.toLowerCase().trim();
-                if (!q) return true;
-                return po.person.name.toLowerCase().includes(q) || 
-                       (po.deliveryPlace && po.deliveryPlace.toLowerCase().includes(q));
-              })
-              .map((po) => (
-              <View key={po.person.id} style={styles.personCard}>
+          .map((group) => {
+            const isCollapsed = collapsedLocations[group.location];
+            return (
+              <View key={group.location} style={styles.locationGroup}>
+                <TouchableOpacity 
+                  style={styles.locationHeaderRow} 
+                  onPress={() => toggleLocationCollapse(group.location)}
+                  activeOpacity={0.7}>
+                  <FontAwesome 
+                    name={isCollapsed ? 'caret-right' : 'caret-down'} 
+                    size={20} 
+                    color="#8bb8e8" 
+                    style={{ width: 20 }} 
+                  />
+                  <Text style={styles.deliveryLocationTitle}>📍 {group.location}</Text>
+                </TouchableOpacity>
+
+                {!isCollapsed && group.orders
+                  .filter(po => {
+                    const q = searchQuery.toLowerCase().trim();
+                    if (!q) return true;
+                    return po.person.name.toLowerCase().includes(q) || 
+                           (po.deliveryPlace && po.deliveryPlace.toLowerCase().includes(q));
+                  })
+                  .map((po) => (
+                  <View key={po.person.id} style={styles.personCard}>
             <View style={styles.personHeader}>
               <View>
                 <Text style={styles.personName}>{po.person.name}</Text>
@@ -393,11 +434,12 @@ export default function TheRunScreen() {
                   </TouchableOpacity>
                 )}
               </View>
+                  </View>
+                </View>
+              ))}
             </View>
-          </View>
-        ))}
-          </View>
-        ))}
+          );
+        })}
       </ScrollView>
 
       {/* Unknown Price Notes Modal */}
@@ -437,7 +479,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   locationGroup: { marginBottom: 25 },
-  deliveryLocationTitle: { fontSize: 18, fontWeight: 'bold', color: '#8bb8e8', marginBottom: 12, marginLeft: 5 },
+  locationHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginLeft: 5 },
+  deliveryLocationTitle: { fontSize: 18, fontWeight: 'bold', color: '#8bb8e8', marginLeft: 5 },
   timingGroup: { marginBottom: 15 },
   timingTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginBottom: 5 },
   sourceGroup: { marginLeft: 10, marginBottom: 12 },
@@ -446,7 +489,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 5,
+    paddingVertical: 5,
   },
+  sourceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   sourceTitle: { fontSize: 16, color: '#aaa' },
   sourceCost: { fontSize: 16, fontWeight: 'bold', color: '#ffeb3b' },
   itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginLeft: 10 },
