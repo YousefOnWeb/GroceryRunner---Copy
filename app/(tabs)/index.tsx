@@ -113,11 +113,36 @@ export default function TheRunScreen() {
       groupedList = { _all: bySource };
     }
 
+    // Group people orders by location
+    const groupedDeliveries: Record<string, typeof pOrders[string][]> = {};
+    Object.values(pOrders).forEach((po) => {
+      const loc = po.deliveryPlace || 'No Location';
+      if (!groupedDeliveries[loc]) groupedDeliveries[loc] = [];
+      groupedDeliveries[loc].push(po);
+    });
+
+    // Sort location groups based on settings.locationOrder
+    const sortedLocations = Object.keys(groupedDeliveries).sort((a, b) => {
+      const idxA = settings.locationOrder.indexOf(a);
+      const idxB = settings.locationOrder.indexOf(b);
+      
+      // If both in order list, use list order
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      // If only one in list, it comes first
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      // Otherwise alphabetical
+      return a.localeCompare(b);
+    });
+
     return {
       aggregatedItems: groupedList,
-      peopleOrders: Object.values(pOrders),
+      peopleOrders: sortedLocations.map(loc => ({
+        location: loc,
+        orders: groupedDeliveries[loc]
+      })),
     };
-  }, [allOrders, allOrderItems, catalog, people, targetDateSelection, settings.groupByFreshness]);
+  }, [allOrders, allOrderItems, catalog, people, targetDateSelection, settings.groupByFreshness, settings.locationOrder]);
 
   const toggleCheck = (itemId: string) => {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
@@ -270,14 +295,18 @@ export default function TheRunScreen() {
         </View>
 
         {peopleOrders
-          .filter(po => {
-            const q = searchQuery.toLowerCase().trim();
-            if (!q) return true;
-            return po.person.name.toLowerCase().includes(q) || 
-                   (po.deliveryPlace && po.deliveryPlace.toLowerCase().includes(q));
-          })
-          .map((po) => (
-          <View key={po.person.id} style={styles.personCard}>
+          .map((group) => (
+          <View key={group.location} style={styles.locationGroup}>
+            <Text style={styles.deliveryLocationTitle}>📍 {group.location}</Text>
+            {group.orders
+              .filter(po => {
+                const q = searchQuery.toLowerCase().trim();
+                if (!q) return true;
+                return po.person.name.toLowerCase().includes(q) || 
+                       (po.deliveryPlace && po.deliveryPlace.toLowerCase().includes(q));
+              })
+              .map((po) => (
+              <View key={po.person.id} style={styles.personCard}>
             <View style={styles.personHeader}>
               <View>
                 <Text style={styles.personName}>{po.person.name}</Text>
@@ -367,6 +396,8 @@ export default function TheRunScreen() {
             </View>
           </View>
         ))}
+          </View>
+        ))}
       </ScrollView>
 
       {/* Unknown Price Notes Modal */}
@@ -405,6 +436,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     width: '100%',
   },
+  locationGroup: { marginBottom: 25 },
+  deliveryLocationTitle: { fontSize: 18, fontWeight: 'bold', color: '#8bb8e8', marginBottom: 12, marginLeft: 5 },
   timingGroup: { marginBottom: 15 },
   timingTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginBottom: 5 },
   sourceGroup: { marginLeft: 10, marginBottom: 12 },

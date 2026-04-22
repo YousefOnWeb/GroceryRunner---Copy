@@ -425,11 +425,22 @@ export const api = {
   },
 
   getDistinctPlaces: async (): Promise<string[]> => {
-    const rows = await db
-      .selectDistinct({ typicalPlace: persons.typicalPlace })
+    const personPlaces = await db
+      .selectDistinct({ place: persons.typicalPlace })
       .from(persons)
       .where(sql`${persons.typicalPlace} IS NOT NULL AND ${persons.typicalPlace} != ''`);
-    return rows.map(r => r.typicalPlace).filter((s): s is string => s !== null);
+    
+    const orderPlaces = await db
+      .selectDistinct({ place: orders.deliveryPlace })
+      .from(orders)
+      .where(sql`${orders.deliveryPlace} IS NOT NULL AND ${orders.deliveryPlace} != ''`);
+
+    const all = new Set([
+      ...personPlaces.map(r => r.place).filter((s): s is string => s !== null),
+      ...orderPlaces.map(r => r.place).filter((s): s is string => s !== null),
+    ]);
+    
+    return Array.from(all);
   },
 
   deletePerson: async (id: string) => {
