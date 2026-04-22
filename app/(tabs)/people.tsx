@@ -59,20 +59,20 @@ export default function PeopleScreen() {
     setEditModalVisible(true);
   };
 
-  const getBalanceLabel = (balance: number) => {
+  const getBalanceLabel = (balance: number, hasUnknownPrices: boolean) => {
     if (balance < 0) {
       return `Your money with them: $${Math.abs(balance).toFixed(2)}`;
     } else if (balance > 0) {
       return `Their money with you: $${balance.toFixed(2)}`;
     } else {
-      return 'Settled';
+      return hasUnknownPrices ? 'Awaiting Prices' : 'Settled';
     }
   };
 
-  const getBalanceColor = (balance: number) => {
+  const getBalanceColor = (balance: number, hasUnknownPrices: boolean) => {
     if (balance < 0) return '#ff4444';
     if (balance > 0) return '#00C851';
-    return '#aaa';
+    return hasUnknownPrices ? '#ff9800' : '#aaa';
   };
 
   const getAliasesForPerson = (personId: string) => {
@@ -110,8 +110,8 @@ export default function PeopleScreen() {
                   </Text>
                 ) : null}
                 <View style={styles.balanceRow}>
-                  <Text style={[styles.balance, { color: getBalanceColor(person.balance) }]}>
-                    {getBalanceLabel(person.balance)}
+                  <Text style={[styles.balance, { color: getBalanceColor(person.balance, peopleWithUnknownPrices.has(person.id)) }]}>
+                    {getBalanceLabel(person.balance, peopleWithUnknownPrices.has(person.id))}
                   </Text>
                   {peopleWithUnknownPrices.has(person.id) && (
                     <TouchableOpacity

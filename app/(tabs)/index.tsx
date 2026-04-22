@@ -47,11 +47,19 @@ export default function TheRunScreen() {
 
       let totalCost = 0;
       let unpaidCost = 0;
+      let hasUnpaidItems = false;
+      let hasUnknownPriceItems = false;
+
       const orderDetails = itemsForOrder.map((oi) => {
         const itemDef = catalog.find((c) => c.id === oi.itemId);
         const cost = (oi.unitPrice ?? 0) * oi.quantity;
         totalCost += cost;
-        if (!oi.isPaid) unpaidCost += cost;
+        
+        if (!oi.isPaid) {
+          unpaidCost += cost;
+          hasUnpaidItems = true;
+          if (oi.unitPrice === null) hasUnknownPriceItems = true;
+        }
 
         // Aggregate for shopping list
         if (itemDef) {
@@ -66,7 +74,16 @@ export default function TheRunScreen() {
       });
 
       if (person) {
-        pOrders[person.id] = { person, order, items: orderDetails, totalCost, unpaidCost, deliveryPlace: order.deliveryPlace || person.typicalPlace };
+        pOrders[person.id] = { 
+          person, 
+          order, 
+          items: orderDetails, 
+          totalCost, 
+          unpaidCost, 
+          hasUnpaidItems,
+          hasUnknownPriceItems,
+          deliveryPlace: order.deliveryPlace || person.typicalPlace 
+        };
       }
     });
 
@@ -297,7 +314,7 @@ export default function TheRunScreen() {
                     </TouchableOpacity>
                     <View style={styles.itemInfo}>
                       <Text style={[styles.personItemText, i.isPaid && styles.personItemPaid]}>
-                        {i.quantity}x {i.itemDef?.name} - ${itemCost.toFixed(2)}
+                        {i.quantity}x {i.itemDef?.name} - {i.unitPrice === null ? 'Price TBD' : `$${itemCost.toFixed(2)}`}
                       </Text>
                     </View>
                   </View>
@@ -308,18 +325,17 @@ export default function TheRunScreen() {
             <View style={styles.personFooter}>
               <View>
                 <View style={styles.balanceHeaderRow}>
-                  <Text style={[styles.balanceLabel, po.person.balance < 0 ? styles.debtLabel : styles.creditLabel]}>
+                  <Text style={[styles.balanceLabel, po.person.balance < 0 ? styles.debtLabel : po.person.balance > 0 ? styles.creditLabel : po.hasUnknownPriceItems ? styles.pendingLabel : styles.settledLabel]}>
                     {po.person.balance < 0
                       ? 'Your money with them: '
                       : po.person.balance > 0
                       ? 'Their money with you: '
+                      : po.hasUnknownPriceItems
+                      ? 'Awaiting Prices: '
                       : 'Settled: '}
                   </Text>
                   {/* Notes icon for unknown prices */}
-                  {allOrderItems?.some(oi => {
-                    const order = allOrders?.find(o => o.id === oi.orderId);
-                    return order?.personId === po.person.id && !oi.isPaid && oi.unitPrice === null;
-                  }) && (
+                  {po.hasUnknownPriceItems && (
                     <TouchableOpacity
                       onPress={() => setUnknownPricePerson({ id: po.person.id, name: po.person.name })}
                       style={styles.notesBtn}>
@@ -327,12 +343,12 @@ export default function TheRunScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-                <Text style={po.person.balance < 0 ? styles.debt : po.person.balance > 0 ? styles.credit : styles.settled}>
+                <Text style={po.person.balance < 0 ? styles.debt : po.person.balance > 0 ? styles.credit : po.hasUnknownPriceItems ? styles.pending : styles.settled}>
                   ${Math.abs(po.person.balance).toFixed(2)}
                 </Text>
               </View>
               <View style={styles.buttonGroup}>
-                {po.unpaidCost > 0 ? (
+                {po.hasUnpaidItems ? (
                   <TouchableOpacity
                     style={styles.markAllPaidBtn}
                     onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
@@ -425,8 +441,11 @@ const styles = StyleSheet.create({
   notesBtn: { padding: 4 },
   debtLabel: { color: '#ff4444' },
   creditLabel: { color: '#00C851' },
+  pendingLabel: { color: '#ff9800' },
+  settledLabel: { color: '#aaa' },
   debt: { color: '#ff4444', fontWeight: 'bold', fontSize: 16 },
   credit: { color: '#00C851', fontWeight: 'bold', fontSize: 16 },
+  pending: { color: '#ff9800', fontWeight: 'bold', fontSize: 16 },
   settled: { color: '#aaa', fontWeight: 'bold', fontSize: 16 },
   buttonGroup: { alignItems: 'flex-end' },
   markAllPaidBtn: { backgroundColor: '#2f95dc', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
