@@ -15,6 +15,7 @@ export default function StatsScreen() {
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
 
   const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [itemSearch, setItemSearch] = useState('');
 
   const stats = useMemo(() => {
     if (!peopleList || !catalog || !allOrders || !allOrderItems) return null;
@@ -117,10 +118,19 @@ export default function StatsScreen() {
         <View style={styles.separator} />
 
         {/* ITEMS DICTIONARY SECTION */}
-        <Text style={styles.sectionTitle}>📖 Items Dictionary</Text>
+        <View style={styles.dictionaryHeader}>
+          <Text style={styles.sectionTitle}>📖 Items Dictionary</Text>
+          <TextInput
+            style={styles.dictionarySearch}
+            value={itemSearch}
+            onChangeText={setItemSearch}
+            placeholder="Search items..."
+            placeholderTextColor="#888"
+          />
+        </View>
         <Text style={styles.helperText}>Update default prices, sources, and timing for your items here.</Text>
 
-        {catalog?.map((item) => (
+        {catalog?.filter(item => item.name.toLowerCase().includes(itemSearch.toLowerCase().trim())).map((item) => (
           <View key={item.id} style={styles.itemCard}>
             <View style={styles.itemHeader}>
               <Text style={styles.itemName}>{item.name}</Text>
@@ -177,6 +187,21 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
   actionButtons: { flexDirection: 'row', gap: 15 },
   iconBtn: { padding: 5 },
+  dictionaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  dictionarySearch: {
+    backgroundColor: '#333',
+    color: '#fff',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    fontSize: 14,
+    width: '40%',
+  },
   itemDetails: { gap: 5 },
   detailText: { color: '#ccc' },
 });

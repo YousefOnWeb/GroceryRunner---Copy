@@ -369,6 +369,51 @@ export const api = {
     if (updates.name) finalUpdates.name = updates.name.trim();
 
     await db.update(items).set(finalUpdates).where(eq(items.id, id));
+
+    // If defaultPrice was updated from null to a value, or just updated, 
+    // sync it with orders that were waiting for a price (unitPrice is NULL).
+    if (updates.defaultPrice !== undefined && updates.defaultPrice !== null) {
+      const newPrice = updates.defaultPrice;
+      
+      // Find all order items with NULL price for this item
+      const pendingItems = await db.select({
+        oiId: orderItems.id,
+        quantity: orderItems.quantity,
+        personId: orders.personId,
+        orderId: orders.id,
+        isPaid: orderItems.isPaid,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(and(
+        eq(orderItems.itemId, id),
+        sql`${orderItems.unitPrice} IS NULL`
+      ));
+
+      for (const item of pendingItems) {
+        const addedDebt = item.quantity * newPrice;
+        
+        // Update the order item price
+        await db.update(orderItems)
+          .set({ unitPrice: newPrice })
+          .where(eq(orderItems.id, item.oiId));
+
+        // If the item hasn't been paid for yet, update the person's balance
+        if (!item.isPaid) {
+          await db.update(persons)
+            .set({ balance: sql`${persons.balance} - ${addedDebt}` })
+            .where(eq(persons.id, item.personId));
+
+          await db.insert(transactions).values({
+            id: generateId(),
+            personId: item.personId,
+            amount: -addedDebt,
+            date: new Date().toISOString(),
+            type: 'OrderCost', // Or a new type like 'PriceUpdate'
+          });
+        }
+      }
+    }
   },
 
   getDistinctSources: async (): Promise<string[]> => {
