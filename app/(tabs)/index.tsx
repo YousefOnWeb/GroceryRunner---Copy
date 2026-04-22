@@ -290,7 +290,9 @@ export default function TheRunScreen() {
                   <TouchableOpacity onPress={() => handleDeleteOrder(po.order.id, po.person.name)} style={styles.deleteOrderBtn}>
                     <FontAwesome name="trash" size={16} color="#ff4444" />
                   </TouchableOpacity>
-                  <Text style={styles.personTotal}>${po.totalCost.toFixed(2)}</Text>
+                  <Text style={styles.personTotal}>
+                    ${po.totalCost.toFixed(2)}{po.hasUnknownPriceItems ? ' + TBD' : ''}
+                  </Text>
                 </View>
                 {po.unpaidCost > 0 && (
                   <Text style={styles.unpaidCost}>(${po.unpaidCost.toFixed(2)} unpaid)</Text>
