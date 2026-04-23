@@ -1,20 +1,21 @@
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import DropdownSelect from '@/components/DropdownSelect';
 import UnknownPriceModal from '@/components/UnknownPriceModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
 import { items, orderItems, orders, persons } from '@/db/schema';
-import { extractDateValue, generateDateOptions } from '@/utils/dates';
+import { extractDateValue, formatDateLabel, getDefaultDate } from '@/utils/dates';
 import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
 export default function TheRunScreen() {
-  const dateOptions = useMemo(() => generateDateOptions(30), []);
-  // Set default to Tomorrow's label
-  const [targetDateSelection, setTargetDateSelection] = useState(dateOptions[1]);
+  const [targetDate, setTargetDate] = useState(getDefaultDate());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [paidItems, setPaidItems] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,7 +42,7 @@ export default function TheRunScreen() {
       return { aggregatedItems: {}, peopleOrders: [] };
     }
 
-    const targetDateDb = extractDateValue(targetDateSelection);
+    const targetDateDb = targetDate.toISOString().split('T')[0];
     // JS-based filtering ensures perfect reactivity when targetDateSelection changes
     const filteredOrders = allOrders.filter(o => o.targetDate === targetDateDb);
 
@@ -146,7 +147,7 @@ export default function TheRunScreen() {
         orders: groupedDeliveries[loc]
       })),
     };
-  }, [allOrders, allOrderItems, catalog, people, targetDateSelection, settings.groupByFreshness, settings.locationOrder]);
+  }, [allOrders, allOrderItems, catalog, people, targetDate, settings.groupByFreshness, settings.locationOrder]);
 
   const toggleCheck = (itemId: string) => {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
@@ -181,6 +182,54 @@ export default function TheRunScreen() {
       console.error(e);
       Alert.alert('Error', 'Failed to mark order as unpaid');
     }
+  };
+
+  const handleCopyRun = async () => {
+    let text = `🛒 RUN SUMMARY: ${formatDateLabel(targetDate)}\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    // 1. Shopping List
+    text += `🛍️ SHOPPING LIST\n`;
+    Object.entries(aggregatedItems).forEach(([timingKey, sources]) => {
+      if (settings.groupByFreshness && timingKey !== '_all') {
+        text += `\n[ ${timingKey.toUpperCase()} ]\n`;
+      }
+      Object.entries(sources).forEach(([source, itemsList]) => {
+        text += `\n📍 ${source}:\n`;
+        itemsList.forEach(ag => {
+          text += `  - ${ag.totalQuantity}x ${ag.item.name}`;
+          if (ag.totalCost > 0) text += ` ($${ag.totalCost.toFixed(2)})`;
+          else text += ` (Price TBD)`;
+          text += `\n`;
+        });
+      });
+    });
+
+    text += `\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    // 2. Deliveries
+    text += `🚚 DELIVERIES & PAYMENTS\n`;
+    peopleOrders.forEach(group => {
+      text += `\n📍 ${group.location}\n`;
+      group.orders.forEach(po => {
+        text += `  👤 ${po.person.name}:\n`;
+        po.items.forEach(i => {
+          const cost = i.unitPrice !== null ? `$${(i.unitPrice * i.quantity).toFixed(2)}` : 'TBD';
+          text += `    • ${i.quantity}x ${i.itemDef?.name} - ${cost} ${i.isPaid ? '✅' : '❌'}\n`;
+        });
+        text += `    Total: $${po.totalCost.toFixed(2)}${po.hasUnknownPriceItems ? ' + TBD' : ''}\n`;
+        
+        let balText = '';
+        if (po.person.balance < 0) balText = `You are owed: $${Math.abs(po.person.balance).toFixed(2)}`;
+        else if (po.person.balance > 0) balText = `You owe them: $${po.person.balance.toFixed(2)}`;
+        else balText = po.hasUnknownPriceItems ? 'Awaiting Prices' : 'Settled';
+        
+        text += `    Balance: ${balText}\n`;
+      });
+    });
+
+    await Clipboard.setStringAsync(text);
+    Alert.alert('Copied!', 'Run summary copied to clipboard.');
   };
 
   const handleDeleteOrder = (orderId: string, personName: string) => {
@@ -221,6 +270,13 @@ export default function TheRunScreen() {
   const hasItems = Object.keys(aggregatedItems).length > 0 &&
     Object.values(aggregatedItems).some(sources => Object.keys(sources).length > 0);
 
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setTargetDate(selectedDate);
+    }
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
@@ -228,17 +284,26 @@ export default function TheRunScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
       <View style={[styles.header, { zIndex: 10 }]}>
-        <Text style={styles.headerTitle}>Target Date:</Text>
-        <View style={{ flex: 1 }}>
-          <DropdownSelect
-            value={targetDateSelection}
-            options={dateOptions}
-            onSelect={setTargetDateSelection}
-            allowCustom
-            placeholder="Select Date"
-          />
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Run:</Text>
+          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateDisplay}>
+            <Text style={styles.dateDisplayText}>{formatDateLabel(targetDate)}</Text>
+            <FontAwesome name="calendar" size={16} color="#2f95dc" />
+          </TouchableOpacity>
         </View>
+        <TouchableOpacity onPress={handleCopyRun} style={styles.copyBtn}>
+          <FontAwesome name="copy" size={20} color="#2f95dc" />
+        </TouchableOpacity>
       </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={targetDate}
+          mode="date"
+          display="default"
+          onChange={onDateChange}
+        />
+      )}
 
       <ScrollView style={styles.content}>
         <Text style={styles.sectionTitle}>🛍️ The Shopping List</Text>
@@ -459,11 +524,25 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 15,
     backgroundColor: '#222',
   },
-  headerTitle: { fontSize: 16, color: '#fff', marginRight: 10 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
+  dateDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#333',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 10,
+    flex: 1,
+  },
+  dateDisplayText: { color: '#fff', fontSize: 14, fontWeight: '500' },
+  headerTitle: { fontSize: 16, color: '#fff' },
+  copyBtn: { padding: 10, marginLeft: 5 },
   content: { padding: 15 },
   deliveriesHeader: {
     marginBottom: 15,

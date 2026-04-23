@@ -14,7 +14,7 @@ interface PersonModalProps {
   initialAliases?: string[];
   initialBalance?: number;
   onCancel: () => void;
-  onDone: () => void;
+  onDone: (personId?: string) => void;
 }
 
 export default function PersonModal({
@@ -93,8 +93,9 @@ export default function PersonModal({
 
     try {
       if (mode === 'create') {
-        await api.addPerson(name, place || null, aliases);
+        const result = await api.addPerson(name, place || null, aliases);
         Alert.alert('Success', `${name} has been added.`);
+        onDone(result[0].id);
       } else if (mode === 'edit' && personId) {
         await api.updatePerson(personId, {
           name: name.trim(),

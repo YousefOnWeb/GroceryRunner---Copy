@@ -8,7 +8,8 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { and, eq, sql } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
 interface EditState {
   personId: string;
@@ -79,15 +80,57 @@ export default function PeopleScreen() {
     return allAliases?.filter(a => a.personId === personId).map(a => a.alias) || [];
   };
 
+  const handleCopyPeople = async () => {
+    if (!peopleList) return;
+
+    let text = `👥 PEOPLE & BALANCES SUMMARY\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    peopleList.forEach(p => {
+      const hasUnknownPrices = peopleWithUnknownPrices.has(p.id);
+      let statusIcon = '✅';
+      let balText = '';
+
+      if (p.balance < 0) {
+        statusIcon = '❌';
+        balText = `You are owed: $${Math.abs(p.balance).toFixed(2)}`;
+      } else if (p.balance > 0) {
+        statusIcon = '✅'; // They have credit with you
+        balText = `They have credit: $${p.balance.toFixed(2)}`;
+      } else {
+        if (hasUnknownPrices) {
+          statusIcon = '❌';
+          balText = `Awaiting Prices (TBD)`;
+        } else {
+          statusIcon = '✅';
+          balText = `Settled`;
+        }
+      }
+
+      text += `${statusIcon} ${p.name}\n`;
+      text += `   ${balText}\n`;
+      if (p.typicalPlace) text += `   📍 ${p.typicalPlace}\n`;
+      text += `\n`;
+    });
+
+    await Clipboard.setStringAsync(text);
+    Alert.alert('Copied!', 'Balance summary copied to clipboard.');
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Colleagues & Balances</Text>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setCreateModalVisible(true)}>
-            <FontAwesome name="plus" size={16} color="#fff" />
-            <Text style={styles.addBtnText}>Add Person</Text>
-          </TouchableOpacity>
+          <Text style={styles.title}>Balances</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity onPress={handleCopyPeople} style={styles.copyBtn}>
+              <FontAwesome name="copy" size={20} color="#2f95dc" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addBtn} onPress={() => setCreateModalVisible(true)}>
+              <FontAwesome name="plus" size={16} color="#fff" />
+              <Text style={styles.addBtnText}>Add Person</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {peopleList?.map((person) => {
@@ -176,6 +219,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  copyBtn: { padding: 5 },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',

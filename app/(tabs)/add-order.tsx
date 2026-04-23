@@ -1,3 +1,4 @@
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import CreateItemModal from '@/components/CreateItemModal';
 import DropdownSelect from '@/components/DropdownSelect';
 import PersonModal from '@/components/PersonModal';
@@ -5,7 +6,7 @@ import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
 import { items, orderItems, orders, personAliases, persons } from '@/db/schema';
-import { extractDateValue, generateDateOptions } from '@/utils/dates';
+import { extractDateValue, formatDateLabel, getDefaultDate } from '@/utils/dates';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
@@ -18,8 +19,8 @@ export default function AddOrderScreen() {
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
 
-  const dateOptions = useMemo(() => generateDateOptions(30), []);
-  const [targetDateSelection, setTargetDateSelection] = useState<string>(dateOptions[1]); // Default tomorrow
+  const [targetDate, setTargetDate] = useState(getDefaultDate());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [cart, setCart] = useState<{ item: any; quantity: number }[]>([]);
   
   // Item search state
@@ -38,7 +39,7 @@ export default function AddOrderScreen() {
 
   const [editModeOrderId, setEditModeOrderId] = useState<string | null>(null);
 
-  const targetDateDb = extractDateValue(targetDateSelection);
+  const targetDateDb = targetDate.toISOString().split('T')[0];
   const existingOrder = useMemo(() => {
     if (!allOrders || !selectedPersonId) return null;
     return allOrders.find(o => o.personId === selectedPersonId && o.targetDate === targetDateDb);
@@ -152,9 +153,20 @@ export default function AddOrderScreen() {
     }
   };
 
-  const handleCreatePersonDone = () => {
+  const handleCreatePersonDone = (newPersonId?: string) => {
     setPersonModalVisible(false);
-    // Person created — user can now find them in the search
+    if (newPersonId) {
+      handleSelectPerson(newPersonId);
+      setPersonSearchQuery('');
+    }
+  };
+
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setTargetDate(selectedDate);
+      setEditModeOrderId(null);
+    }
   };
 
   const filteredCatalog = catalog?.filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase())) || [];
@@ -256,16 +268,20 @@ export default function AddOrderScreen() {
         {/* 2. When? */}
         <View style={[styles.section, { zIndex: 10 }]}>
           <Text style={styles.sectionTitle}>2. When?</Text>
-          <View style={{ zIndex: 10 }}>
-            <DropdownSelect
-              value={targetDateSelection}
-              options={dateOptions}
-              onSelect={(val) => { setTargetDateSelection(val); setEditModeOrderId(null); }}
-              allowCustom
-              placeholder="Select Date"
-            />
-          </View>
+          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateDisplay}>
+            <Text style={styles.dateDisplayText}>{formatDateLabel(targetDate)}</Text>
+            <FontAwesome name="calendar" size={16} color="#2f95dc" />
+          </TouchableOpacity>
         </View>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={targetDate}
+            mode="date"
+            display="default"
+            onChange={onDateChange}
+          />
+        )}
 
         {/* 2.5 Delivery Place */}
         {selectedPersonId && (
@@ -374,10 +390,7 @@ export default function AddOrderScreen() {
         mode="create"
         initialName={personSearchQuery}
         onCancel={() => setPersonModalVisible(false)}
-        onDone={() => {
-          setPersonModalVisible(false);
-          setPersonSearchQuery('');
-        }}
+        onDone={handleCreatePersonDone}
       />
     </View>
   );
@@ -478,4 +491,14 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: 'bold',
   },
+  dateDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#333',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 10,
+  },
+  dateDisplayText: { color: '#fff', fontSize: 16, fontWeight: '500' },
 });

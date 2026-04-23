@@ -20,8 +20,35 @@ export function generateDateOptions(days: number = 14) {
 }
 
 export function extractDateValue(selection: string) {
-  // If the user selects "Today - 2026-04-18 (Sat)" we want "2026-04-18"
-  // If they enter a custom value "2026-12-01", we want that.
   const match = selection.match(/\d{4}-\d{2}-\d{2}/);
   return match ? match[0] : selection;
+}
+
+export function getDefaultDate() {
+  const now = new Date();
+  const hour = now.getHours();
+  const target = new Date(now);
+  // Default to tomorrow if current time is between 4pm (16:00) and 11:59pm
+  if (hour >= 16) {
+    target.setDate(now.getDate() + 1);
+  }
+  return target;
+}
+
+export function formatDateLabel(date: Date) {
+  const value = date.toISOString().split('T')[0];
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+  
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  
+  let label = `${value} (${weekday})`;
+  if (value === todayStr) label = `Today - ${label}`;
+  else if (value === tomorrowStr) label = `Tomorrow - ${label}`;
+  
+  return label;
 }
