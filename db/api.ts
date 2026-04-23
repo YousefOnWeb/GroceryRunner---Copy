@@ -479,4 +479,9 @@ export const api = {
     ));
     return rows;
   },
+
+  getDistinctSources: async () => {
+    const res = await db.selectDistinct({ source: items.source }).from(items);
+    return res.map(r => r.source).filter((s): s is string => s !== null && s.trim() !== '');
+  },
 };

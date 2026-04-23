@@ -96,26 +96,54 @@ export default function TheRunScreen() {
     type AggItem = typeof agg[string];
     let groupedList: Record<string, Record<string, AggItem[]>>;
 
+    // Helper to sort sources
+    function sortSources(srcs: string[]) {
+      return srcs.sort((a, b) => {
+        const idxA = settings.sourceOrder.indexOf(a);
+        const idxB = settings.sourceOrder.indexOf(b);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.localeCompare(b);
+      });
+    }
+
     if (settings.groupByFreshness) {
-      // Group by timing → source
-      groupedList = Object.values(agg).reduce((acc, curr) => {
+      // Re-group and sort sources
+      const rawGrouped: Record<string, Record<string, AggItem[]>> = {};
+      Object.values(agg).forEach(curr => {
         const timing = curr.item.timing || 'Anytime';
         const source = curr.item.source || 'Unknown';
-        if (!acc[timing]) acc[timing] = {};
-        if (!acc[timing][source]) acc[timing][source] = [];
-        acc[timing][source].push(curr);
-        return acc;
-      }, {} as Record<string, Record<string, AggItem[]>>);
+        if (!rawGrouped[timing]) rawGrouped[timing] = {};
+        if (!rawGrouped[timing][source]) rawGrouped[timing][source] = [];
+        rawGrouped[timing][source].push(curr);
+      });
+
+      const sortedGrouped: Record<string, Record<string, AggItem[]>> = {};
+      ['Fresh', 'Anytime'].forEach(timing => {
+        if (rawGrouped[timing]) {
+          sortedGrouped[timing] = {};
+          const sources = sortSources(Object.keys(rawGrouped[timing]));
+          sources.forEach(src => {
+            sortedGrouped[timing][src] = rawGrouped[timing][src];
+          });
+        }
+      });
+      groupedList = sortedGrouped;
     } else {
-      // Group by source only (single top-level group)
-      const bySource = Object.values(agg).reduce((acc, curr) => {
+      const rawBySource = Object.values(agg).reduce((acc, curr) => {
         const source = curr.item.source || 'Unknown';
         if (!acc[source]) acc[source] = [];
         acc[source].push(curr);
         return acc;
       }, {} as Record<string, AggItem[]>);
-      // Wrap in a single key so the rendering logic stays consistent
-      groupedList = { _all: bySource };
+
+      const sortedBySource: Record<string, AggItem[]> = {};
+      const sources = sortSources(Object.keys(rawBySource));
+      sources.forEach(src => {
+        sortedBySource[src] = rawBySource[src];
+      });
+      groupedList = { _all: sortedBySource };
     }
 
     // Group people orders by location
@@ -147,7 +175,7 @@ export default function TheRunScreen() {
         orders: groupedDeliveries[loc]
       })),
     };
-  }, [allOrders, allOrderItems, catalog, people, targetDate, settings.groupByFreshness, settings.locationOrder]);
+  }, [allOrders, allOrderItems, catalog, people, targetDate, settings.groupByFreshness, settings.locationOrder, settings.sourceOrder]);
 
   const toggleCheck = (itemId: string) => {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 interface Settings {
   groupByFreshness: boolean;
   locationOrder: string[];
+  sourceOrder: string[];
 }
 
 interface SettingsContextType {
@@ -14,6 +15,7 @@ interface SettingsContextType {
 const DEFAULT_SETTINGS: Settings = {
   groupByFreshness: false,
   locationOrder: [],
+  sourceOrder: [],
 };
 
 const STORAGE_KEY = 'grocery_runner_settings';

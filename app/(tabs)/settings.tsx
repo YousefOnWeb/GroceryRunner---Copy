@@ -1,152 +1,278 @@
-import { Text, View } from '@/components/Themed';
+import { Text, View, StyleSheet, Switch, TouchableOpacity, Modal, SafeAreaView } from 'react-native';
 import { api } from '@/db/api';
 import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, TouchableOpacity } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export default function SettingsScreen() {
   const { settings, updateSetting } = useSettings();
   const [locations, setLocations] = useState<string[]>([]);
+  const [sources, setSources] = useState<string[]>([]);
+  
+  const [activeModal, setActiveModal] = useState<'locations' | 'sources' | null>(null);
 
   useEffect(() => {
     (async () => {
       const distinct = await api.getDistinctPlaces();
-      // Merge with existing order to ensure everything is represented
       const merged = [...settings.locationOrder];
       distinct.forEach(loc => {
         if (!merged.includes(loc)) merged.push(loc);
       });
-      // Filter out locations that no longer exist? 
-      // User might want to keep them if they are just temporarily gone, but let's keep it simple.
       setLocations(merged);
     })();
-  }, [settings.locationOrder]);
+  }, [settings.locationOrder, activeModal]);
 
-  const renderLocationItem = ({ item, drag, isActive }: RenderItemParams<string>) => {
+  useEffect(() => {
+    (async () => {
+      const distinct = await api.getDistinctSources();
+      const merged = [...settings.sourceOrder];
+      distinct.forEach(src => {
+        if (!merged.includes(src)) merged.push(src);
+      });
+      setSources(merged);
+    })();
+  }, [settings.sourceOrder, activeModal]);
+
+  const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<string>) => {
     return (
       <ScaleDecorator>
         <TouchableOpacity
           onLongPress={drag}
           disabled={isActive}
           style={[
-            styles.locationRow,
+            styles.draggableRow,
             { backgroundColor: isActive ? '#444' : '#333' }
           ]}>
           <FontAwesome name="bars" size={16} color="#888" style={styles.dragHandle} />
-          <Text style={styles.locationText}>{item}</Text>
+          <Text style={styles.draggableText}>{item}</Text>
         </TouchableOpacity>
       </ScaleDecorator>
     );
   };
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={styles.container}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Settings</Text>
+    <View style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Settings</Text>
 
-          {/* Draggable Locations (Order of Groups) */}
-          <Text style={styles.sectionHeader}>Delivery Groups Order</Text>
-          <Text style={styles.sectionHint}>Long press and drag to reorder how deliveries are grouped in "The Run".</Text>
-          
-          <View style={styles.listContainer}>
-            <DraggableFlatList
-              data={locations}
-              onDragEnd={({ data }) => {
-                setLocations(data);
-                updateSetting('locationOrder', data);
-              }}
-              keyExtractor={(item) => item}
-              renderItem={renderLocationItem}
-              containerStyle={styles.flatList}
-            />
-          </View>
-
-          <View style={styles.separator} />
-
-          {/* Shopping List Settings */}
-          <Text style={styles.sectionHeader}>Shopping List</Text>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Group by Freshness</Text>
-              <Text style={styles.settingHint}>
-                Split the shopping list into "Fresh" and "Anytime" groups
-              </Text>
+        {/* Reorder Delivery Locations */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.sectionHeader}>Delivery Groups</Text>
+              <Text style={styles.sectionHint}>Manage how your run is grouped by location.</Text>
             </View>
-            <Switch
-              value={settings.groupByFreshness}
-              onValueChange={(val) => updateSetting('groupByFreshness', val)}
-              trackColor={{ false: '#555', true: '#2f95dc' }}
-              thumbColor={settings.groupByFreshness ? '#fff' : '#ccc'}
-            />
+            <TouchableOpacity 
+              style={styles.editButton} 
+              onPress={() => setActiveModal('locations')}
+            >
+              <FontAwesome name="sort" size={14} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.editButtonText}>Edit Order</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.previewContainer}>
+            {locations.slice(0, 3).map((loc, i) => (
+              <Text key={loc} style={styles.previewText}>
+                {i + 1}. {loc}
+              </Text>
+            ))}
+            {locations.length > 3 && (
+              <Text style={styles.previewTextMore}>+ {locations.length - 3} more...</Text>
+            )}
           </View>
         </View>
+
+        {/* Reorder Sources */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.sectionHeader}>Shopping Sources</Text>
+              <Text style={styles.sectionHint}>Set the sequence of stores in your list.</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.editButton} 
+              onPress={() => setActiveModal('sources')}
+            >
+              <FontAwesome name="sort" size={14} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.editButtonText}>Edit Order</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.previewContainer}>
+            {sources.slice(0, 3).map((src, i) => (
+              <Text key={src} style={styles.previewText}>
+                {i + 1}. {src}
+              </Text>
+            ))}
+            {sources.length > 3 && (
+              <Text style={styles.previewTextMore}>+ {sources.length - 3} more...</Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.separator} />
+
+        {/* Shopping List Settings */}
+        <Text style={styles.sectionHeader}>Workflow Settings</Text>
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingLabel}>Group by Freshness</Text>
+            <Text style={styles.settingHint}>
+              Split the shopping list into "Fresh" and "Anytime"
+            </Text>
+          </View>
+          <Switch
+            value={settings.groupByFreshness}
+            onValueChange={(val) => updateSetting('groupByFreshness', val)}
+            trackColor={{ false: '#555', true: '#2f95dc' }}
+            thumbColor={settings.groupByFreshness ? '#fff' : '#ccc'}
+          />
+        </View>
       </View>
-    </GestureHandlerRootView>
+
+      {/* Reorder Modal */}
+      <Modal 
+        visible={activeModal !== null} 
+        animationType="slide" 
+        presentationStyle="fullScreen"
+      >
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#111' }}>
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {activeModal === 'locations' ? 'Reorder Deliveries' : 'Reorder Stores'}
+              </Text>
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={() => setActiveModal(null)}
+              >
+                <Text style={styles.closeButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalHint}>Long press and drag to reorder items.</Text>
+
+            <DraggableFlatList
+              data={activeModal === 'locations' ? locations : sources}
+              onDragEnd={({ data }) => {
+                if (activeModal === 'locations') {
+                  setLocations(data);
+                  updateSetting('locationOrder', data);
+                } else {
+                  setSources(data);
+                  updateSetting('sourceOrder', data);
+                }
+              }}
+              keyExtractor={(item) => item}
+              renderItem={renderDraggableItem}
+              containerStyle={{ flex: 1 }}
+            />
+          </SafeAreaView>
+        </GestureHandlerRootView>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 15, flex: 1 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 25 },
+  container: { flex: 1, backgroundColor: '#111' },
+  content: { padding: 20 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 30 },
+  sectionCard: {
+    backgroundColor: '#222',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderBottomColor: '#333',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
   sectionHeader: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#2f95dc',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
-    marginTop: 10,
+    marginBottom: 4,
   },
   sectionHint: {
     fontSize: 12,
     color: '#888',
-    marginBottom: 15,
   },
-  listContainer: {
-    height: 300, // Fixed height for the draggable list to allow scrolling in the main view if needed
-    backgroundColor: '#222',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 20,
-  },
-  flatList: {
-    flex: 1,
-  },
-  locationRow: {
+  editButton: {
+    backgroundColor: '#2f95dc',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#444',
   },
-  dragHandle: {
-    marginRight: 15,
-  },
-  locationText: {
-    fontSize: 16,
+  editButtonText: {
     color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  previewContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    paddingTop: 10,
+  },
+  previewText: {
+    color: '#ccc',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  previewTextMore: {
+    color: '#666',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#333',
+    marginVertical: 25,
   },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#333',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    backgroundColor: '#222',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 10,
   },
   settingInfo: { flex: 1, marginRight: 15 },
-  settingLabel: { fontSize: 16, color: '#fff', fontWeight: '600', marginBottom: 3 },
+  settingLabel: { fontSize: 16, color: '#fff', fontWeight: '600', marginBottom: 4 },
   settingHint: { fontSize: 12, color: '#888' },
-  separator: {
-    height: 1,
-    backgroundColor: '#444',
-    marginVertical: 20,
+  
+  // Modal Styles
+  modalContainer: { flex: 1, backgroundColor: '#111' },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
   },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  modalHint: { padding: 20, color: '#888', fontSize: 14 },
+  closeButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+  },
+  closeButtonText: { color: '#2f95dc', fontSize: 16, fontWeight: 'bold' },
+  draggableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  dragHandle: { marginRight: 15 },
+  draggableText: { fontSize: 16, color: '#fff' },
 });
