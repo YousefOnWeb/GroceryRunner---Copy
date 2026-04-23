@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet, Switch, TouchableOpacity, Modal, SafeAreaView } from 'react-native';
+import { Text, View, StyleSheet, Switch, TouchableOpacity, Modal, SafeAreaView, ScrollView } from 'react-native';
 import { api } from '@/db/api';
 import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
@@ -53,72 +53,88 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Settings</Text>
+    <View collapsable={false} style={styles.container}>
+      <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
+        <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>Settings</Text>
 
         {/* Reorder Delivery Locations */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
+        <View style={[styles.sectionCard, settings.compactMode && styles.cardCompact]}>
+          <View style={[styles.sectionHeaderRow, settings.compactMode && styles.headerRowCompact]}>
             <View>
-              <Text style={styles.sectionHeader}>Delivery Groups</Text>
-              <Text style={styles.sectionHint}>Manage how your run is grouped by location.</Text>
+              <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>Delivery Groups</Text>
+              <Text style={[styles.sectionHint, settings.compactMode && styles.textExtraSmall]}>Manage how your run is grouped by location.</Text>
             </View>
             <TouchableOpacity 
-              style={styles.editButton} 
+              style={[styles.editButton, settings.compactMode && styles.btnCompact]} 
               onPress={() => setActiveModal('locations')}
             >
-              <FontAwesome name="sort" size={14} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={styles.editButtonText}>Edit Order</Text>
+              <FontAwesome name="sort" size={settings.compactMode ? 12 : 14} color="#fff" style={{ marginRight: settings.compactMode ? 4 : 6 }} />
+              <Text style={[styles.editButtonText, settings.compactMode && styles.textExtraSmall]}>Edit Order</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.previewContainer}>
-            {locations.slice(0, 3).map((loc, i) => (
-              <Text key={loc} style={styles.previewText}>
+          <View style={[styles.previewContainer, settings.compactMode && styles.previewCompact]}>
+            {locations.slice(0, settings.compactMode ? 2 : 3).map((loc, i) => (
+              <Text key={loc} style={[styles.previewText, settings.compactMode && styles.textExtraSmall]}>
                 {i + 1}. {loc}
               </Text>
             ))}
-            {locations.length > 3 && (
-              <Text style={styles.previewTextMore}>+ {locations.length - 3} more...</Text>
+            {locations.length > (settings.compactMode ? 2 : 3) && (
+              <Text style={[styles.previewTextMore, settings.compactMode && styles.textExtraSmall]}>+ {locations.length - (settings.compactMode ? 2 : 3)} more...</Text>
             )}
           </View>
         </View>
 
         {/* Reorder Sources */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
+        <View style={[styles.sectionCard, settings.compactMode && styles.cardCompact]}>
+          <View style={[styles.sectionHeaderRow, settings.compactMode && styles.headerRowCompact]}>
             <View>
-              <Text style={styles.sectionHeader}>Shopping Sources</Text>
-              <Text style={styles.sectionHint}>Set the sequence of stores in your list.</Text>
+              <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>Shopping Sources</Text>
+              <Text style={[styles.sectionHint, settings.compactMode && styles.textExtraSmall]}>Set the sequence of stores in your list.</Text>
             </View>
             <TouchableOpacity 
-              style={styles.editButton} 
+              style={[styles.editButton, settings.compactMode && styles.btnCompact]} 
               onPress={() => setActiveModal('sources')}
             >
-              <FontAwesome name="sort" size={14} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={styles.editButtonText}>Edit Order</Text>
+              <FontAwesome name="sort" size={settings.compactMode ? 12 : 14} color="#fff" style={{ marginRight: settings.compactMode ? 4 : 6 }} />
+              <Text style={[styles.editButtonText, settings.compactMode && styles.textExtraSmall]}>Edit Order</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.previewContainer}>
-            {sources.slice(0, 3).map((src, i) => (
-              <Text key={src} style={styles.previewText}>
+          <View style={[styles.previewContainer, settings.compactMode && styles.previewCompact]}>
+            {sources.slice(0, settings.compactMode ? 2 : 3).map((src, i) => (
+              <Text key={src} style={[styles.previewText, settings.compactMode && styles.textExtraSmall]}>
                 {i + 1}. {src}
               </Text>
             ))}
-            {sources.length > 3 && (
-              <Text style={styles.previewTextMore}>+ {sources.length - 3} more...</Text>
+            {sources.length > (settings.compactMode ? 2 : 3) && (
+              <Text style={[styles.previewTextMore, settings.compactMode && styles.textExtraSmall]}>+ {sources.length - (settings.compactMode ? 2 : 3)} more...</Text>
             )}
           </View>
         </View>
 
         <View style={styles.separator} />
 
-        {/* Shopping List Settings */}
-        <Text style={styles.sectionHeader}>Workflow Settings</Text>
-        <View style={styles.settingRow}>
+        {/* UI Settings */}
+        <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>UI Settings</Text>
+        
+        <View style={[styles.settingRow, settings.compactMode && styles.rowCompact]}>
           <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Group by Freshness</Text>
-            <Text style={styles.settingHint}>
+            <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Compact Mode</Text>
+            <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall]}>
+              Reduce padding and font sizes for a denser layout
+            </Text>
+          </View>
+          <Switch
+            value={settings.compactMode}
+            onValueChange={(val) => updateSetting('compactMode', val)}
+            trackColor={{ false: '#555', true: '#2f95dc' }}
+            thumbColor={settings.compactMode ? '#fff' : '#ccc'}
+          />
+        </View>
+
+        <View style={[styles.settingRow, settings.compactMode && styles.rowCompact]}>
+          <View style={styles.settingInfo}>
+            <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Group by Freshness</Text>
+            <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall]}>
               Split the shopping list into "Fresh" and "Anytime"
             </Text>
           </View>
@@ -129,7 +145,7 @@ export default function SettingsScreen() {
             thumbColor={settings.groupByFreshness ? '#fff' : '#ccc'}
           />
         </View>
-      </View>
+      </ScrollView>
 
       {/* Reorder Modal */}
       <Modal 
@@ -275,4 +291,15 @@ const styles = StyleSheet.create({
   },
   dragHandle: { marginRight: 15 },
   draggableText: { fontSize: 16, color: '#fff' },
+  
+  // Compact Modifiers
+  contentCompact: { padding: 10 },
+  titleCompact: { fontSize: 22, marginBottom: 15 },
+  cardCompact: { padding: 10, marginBottom: 10 },
+  headerRowCompact: { marginBottom: 6 },
+  rowCompact: { padding: 10, marginTop: 5 },
+  btnCompact: { paddingHorizontal: 8, paddingVertical: 4 },
+  previewCompact: { paddingTop: 6 },
+  textSmall: { fontSize: 14 },
+  textExtraSmall: { fontSize: 11 },
 });

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { useSettings } from '@/utils/settings';
 import { Text, View } from '@/components/Themed';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { db } from '@/db';
@@ -13,6 +14,7 @@ export default function StatsScreen() {
   const { data: catalog } = useLiveQuery(db.select().from(items));
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
+  const { settings } = useSettings();
 
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [itemSearch, setItemSearch] = useState('');
@@ -94,23 +96,23 @@ export default function StatsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
         
         {/* STATISTICS SECTION */}
-        <Text style={styles.sectionTitle}>📊 App Statistics</Text>
+        <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>📊 App Statistics</Text>
         {stats && (
-          <View style={styles.statsCard}>
-            <Text style={styles.statText}>Total Money Handled: <Text style={styles.highlight}>${stats.totalSpent.toFixed(2)}</Text></Text>
-            <Text style={styles.statText}>Total Orders Created: <Text style={styles.highlight}>{stats.totalOrders}</Text></Text>
+          <View style={[styles.statsCard, settings.compactMode && styles.statsCardCompact]}>
+            <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>Total Money Handled: <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>${stats.totalSpent.toFixed(2)}</Text></Text>
+            <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>Total Orders Created: <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>{stats.totalOrders}</Text></Text>
             
-            <Text style={styles.subTitle}>🏆 Top Spenders</Text>
+            <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>🏆 Top Spenders</Text>
             {stats.topSpenders.map((p, idx) => (
-              <Text key={idx} style={styles.listItem}>{idx + 1}. {p.name} - ${p.total.toFixed(2)}</Text>
+              <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {p.name} - ${p.total.toFixed(2)}</Text>
             ))}
 
-            <Text style={styles.subTitle}>🔥 Most Popular Items</Text>
+            <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>🔥 Most Popular Items</Text>
             {stats.topItems.map((i, idx) => (
-              <Text key={idx} style={styles.listItem}>{idx + 1}. {i.name} ({i.qty} ordered)</Text>
+              <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {i.name} ({i.qty} ordered)</Text>
             ))}
           </View>
         )}
@@ -119,35 +121,35 @@ export default function StatsScreen() {
 
         {/* ITEMS DICTIONARY SECTION */}
         <View style={styles.dictionaryHeader}>
-          <Text style={styles.sectionTitle}>📖 Items Dictionary</Text>
+          <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>📖 Items Dictionary</Text>
           <TextInput
-            style={styles.dictionarySearch}
+            style={[styles.dictionarySearch, settings.compactMode && styles.dictionarySearchCompact]}
             value={itemSearch}
             onChangeText={setItemSearch}
             placeholder="Search items..."
             placeholderTextColor="#888"
           />
         </View>
-        <Text style={styles.helperText}>Update default prices, sources, and timing for your items here.</Text>
+        <Text style={[styles.helperText, settings.compactMode && styles.textExtraSmall]}>Update default prices, sources, and timing for your items here.</Text>
 
         {catalog?.filter(item => item.name.toLowerCase().includes(itemSearch.toLowerCase().trim())).map((item) => (
-          <View key={item.id} style={styles.itemCard}>
-            <View style={styles.itemHeader}>
-              <Text style={styles.itemName}>{item.name}</Text>
+          <View key={item.id} style={[styles.itemCard, settings.compactMode && styles.itemCardCompact]}>
+            <View style={[styles.itemHeader, settings.compactMode && styles.itemHeaderCompact]}>
+              <Text style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{item.name}</Text>
               <View style={styles.actionButtons}>
-                <TouchableOpacity onPress={() => handleEditClick(item)} style={styles.iconBtn}>
-                  <FontAwesome name="pencil" size={18} color="#2f95dc" />
+                <TouchableOpacity onPress={() => handleEditClick(item)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
+                  <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDeleteItem(item)} style={styles.iconBtn}>
-                  <FontAwesome name="trash" size={18} color="#ff4444" />
+                <TouchableOpacity onPress={() => handleDeleteItem(item)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
+                  <FontAwesome name="trash" size={settings.compactMode ? 14 : 18} color="#ff4444" />
                 </TouchableOpacity>
               </View>
             </View>
             
-            <View style={styles.itemDetails}>
-              <Text style={styles.detailText}>Price: {item.defaultPrice ? `$${item.defaultPrice}` : 'Not known yet'}</Text>
-              <Text style={styles.detailText}>Source: {item.source || 'Not known yet'}</Text>
-              <Text style={styles.detailText}>Timing: {item.timing}</Text>
+            <View style={[styles.itemDetails, settings.compactMode && styles.itemDetailsCompact]}>
+              <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Price: {item.defaultPrice ? `$${item.defaultPrice}` : 'Not known yet'}</Text>
+              <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Source: {item.source || 'Not known yet'}</Text>
+              <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Timing: {item.timing}</Text>
             </View>
           </View>
         ))}
@@ -204,4 +206,19 @@ const styles = StyleSheet.create({
   },
   itemDetails: { gap: 5 },
   detailText: { color: '#ccc' },
+  
+  // Compact Modifiers
+  contentCompact: { padding: 8 },
+  sectionTitleCompact: { fontSize: 20, marginBottom: 10 },
+  statsCardCompact: { padding: 10, marginBottom: 15 },
+  highlightCompact: { fontSize: 16 },
+  subTitleCompact: { fontSize: 16, marginTop: 10, marginBottom: 5 },
+  dictionarySearchCompact: { paddingVertical: 4, fontSize: 12 },
+  itemCardCompact: { padding: 10, marginBottom: 10 },
+  itemHeaderCompact: { marginBottom: 5 },
+  itemNameCompact: { fontSize: 16 },
+  itemDetailsCompact: { gap: 2 },
+  textSmall: { fontSize: 13 },
+  textExtraSmall: { fontSize: 11 },
+  paddingSmall: { padding: 2 },
 });

@@ -11,6 +11,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { useSettings } from '@/utils/settings';
 
 export default function AddOrderScreen() {
   const { data: people } = useLiveQuery(db.select().from(persons));
@@ -18,6 +19,7 @@ export default function AddOrderScreen() {
   const { data: catalog } = useLiveQuery(db.select().from(items));
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
+  const { settings } = useSettings();
 
   const [targetDate, setTargetDate] = useState(getDefaultDate());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -217,42 +219,42 @@ export default function AddOrderScreen() {
       <ScrollView keyboardShouldPersistTaps="handled">
         
         {/* 1. Who is this for? */}
-        <View style={[styles.section, { zIndex: 20 }]}>
-          <Text style={styles.sectionTitle}>1. Who is this for?</Text>
+        <View style={[styles.section, settings.compactMode && styles.sectionCompact, { zIndex: 20 }]}>
+          <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>1. Who is this for?</Text>
           
           {selectedPersonId ? (
-            <View style={styles.selectedRow}>
-              <Text style={styles.selectedText}>
+            <View style={[styles.selectedRow, settings.compactMode && styles.paddingSmall]}>
+              <Text style={[styles.selectedText, settings.compactMode && styles.textSmall]}>
                 {people?.find(p => p.id === selectedPersonId)?.name}
               </Text>
-              <TouchableOpacity onPress={() => { setSelectedPersonId(null); setEditModeOrderId(null); setCart([]); setDeliveryPlace(''); }} style={styles.changeBtn}>
-                <Text style={styles.changeBtnText}>Change</Text>
+              <TouchableOpacity onPress={() => { setSelectedPersonId(null); setEditModeOrderId(null); setCart([]); setDeliveryPlace(''); }} style={[styles.changeBtn, settings.compactMode && styles.paddingSmall]}>
+                <Text style={[styles.changeBtnText, settings.compactMode && styles.textExtraSmall]}>Change</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-              <View style={styles.searchRow}>
+              <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
                 <TextInput
-                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                  style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
                   value={personSearchQuery}
                   onChangeText={setPersonSearchQuery}
                   placeholder="Search person or nickname..."
                   placeholderTextColor="#888"
                 />
                 {personSearchQuery.trim().length > 0 && !exactPersonMatch && (
-                  <TouchableOpacity style={styles.addButton} onPress={() => setPersonModalVisible(true)}>
-                    <Text style={styles.addButtonText}>Create "{personSearchQuery.trim()}"</Text>
+                  <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setPersonModalVisible(true)}>
+                    <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>Create "{personSearchQuery.trim()}"</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               {filteredPeople.length > 0 && (
-                <View style={styles.grid}>
+                <View style={[styles.grid, settings.compactMode && styles.gridCompact]}>
                   {filteredPeople.slice(0, 8).map((p) => {
                     const matchedAlias = getMatchingAlias(p.id);
                     return (
-                      <TouchableOpacity key={p.id} style={styles.gridItemPerson} onPress={() => handleSelectPerson(p.id)}>
-                        <Text style={styles.gridItemName}>{p.name}</Text>
+                      <TouchableOpacity key={p.id} style={[styles.gridItemPerson, settings.compactMode && styles.gridItemPersonCompact]} onPress={() => handleSelectPerson(p.id)}>
+                        <Text style={[styles.gridItemName, settings.compactMode && styles.textExtraSmall]}>{p.name}</Text>
                         {matchedAlias && (
                           <Text style={styles.gridItemAlias}>({matchedAlias})</Text>
                         )}
@@ -266,11 +268,11 @@ export default function AddOrderScreen() {
         </View>
 
         {/* 2. When? */}
-        <View style={[styles.section, { zIndex: 10 }]}>
-          <Text style={styles.sectionTitle}>2. When?</Text>
-          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateDisplay}>
-            <Text style={styles.dateDisplayText}>{formatDateLabel(targetDate)}</Text>
-            <FontAwesome name="calendar" size={16} color="#2f95dc" />
+        <View style={[styles.section, settings.compactMode && styles.sectionCompact, { zIndex: 10 }]}>
+          <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>2. When?</Text>
+          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
+            <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate)}</Text>
+            <FontAwesome name="calendar" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
           </TouchableOpacity>
         </View>
 
@@ -285,10 +287,10 @@ export default function AddOrderScreen() {
 
         {/* 2.5 Delivery Place */}
         {selectedPersonId && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📍 Deliver to</Text>
+          <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>📍 Deliver to</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, settings.compactMode && styles.inputCompact]}
               value={deliveryPlace}
               onChangeText={setDeliveryPlace}
               placeholder="e.g. Building A, Floor 3"
@@ -308,34 +310,34 @@ export default function AddOrderScreen() {
         )}
 
         {/* 3. What do they want? */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+        <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
+          <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>
             3. What do they want? {editModeOrderId && <Text style={{color: '#ff9800'}}>(Editing)</Text>}
           </Text>
-          <View style={styles.searchRow}>
+          <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
             <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
+              style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search or add item..."
               placeholderTextColor="#888"
             />
             {searchQuery.trim().length > 0 && !exactItemMatch && (
-              <TouchableOpacity style={styles.addButton} onPress={() => setItemModalVisible(true)}>
-                <Text style={styles.addButtonText}>Create "{searchQuery.trim()}"</Text>
+              <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setItemModalVisible(true)}>
+                <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>Create "{searchQuery.trim()}"</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          <View style={styles.grid}>
+          <View style={[styles.grid, settings.compactMode && styles.gridCompact]}>
             {filteredCatalog.slice(0, 12).map((item) => {
               const inCart = cart.find((c) => c.item.id === item.id);
               return (
-                <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => addToCart(item)}>
-                  <Text style={styles.gridItemName}>{item.name}</Text>
+                <TouchableOpacity key={item.id} style={[styles.gridItem, settings.compactMode && styles.gridItemCompact]} onPress={() => addToCart(item)}>
+                  <Text style={[styles.gridItemName, settings.compactMode && styles.textSmall]}>{item.name}</Text>
                   {inCart && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{inCart.quantity}</Text>
+                    <View style={[styles.badge, settings.compactMode && styles.badgeCompact]}>
+                      <Text style={[styles.badgeText, settings.compactMode && styles.textExtraSmall]}>{inCart.quantity}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -346,19 +348,19 @@ export default function AddOrderScreen() {
 
         {/* Cart Review */}
         {cart.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Cart Review</Text>
+          <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>Cart Review</Text>
             {cart.map((c) => {
               return (
-                <View key={c.item.id} style={styles.cartRow}>
-                  <Text style={styles.cartText}>{c.item.name}</Text>
+                <View key={c.item.id} style={[styles.cartRow, settings.compactMode && styles.cartRowCompact]}>
+                  <Text style={[styles.cartText, settings.compactMode && styles.textSmall]}>{c.item.name}</Text>
                   <View style={styles.cartActions}>
-                    <TouchableOpacity onPress={() => removeFromCart(c.item.id)} style={styles.cartBtn}>
-                      <FontAwesome name="minus" size={16} color="#000" />
+                    <TouchableOpacity onPress={() => removeFromCart(c.item.id)} style={[styles.cartBtn, settings.compactMode && styles.paddingSmall]}>
+                      <FontAwesome name="minus" size={settings.compactMode ? 12 : 16} color="#000" />
                     </TouchableOpacity>
-                    <Text style={styles.cartQuantity}>{c.quantity}</Text>
-                    <TouchableOpacity onPress={() => addToCart(c.item)} style={styles.cartBtn}>
-                      <FontAwesome name="plus" size={16} color="#000" />
+                    <Text style={[styles.cartQuantity, settings.compactMode && styles.textSmall]}>{c.quantity}</Text>
+                    <TouchableOpacity onPress={() => addToCart(c.item)} style={[styles.cartBtn, settings.compactMode && styles.paddingSmall]}>
+                      <FontAwesome name="plus" size={settings.compactMode ? 12 : 16} color="#000" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -371,11 +373,12 @@ export default function AddOrderScreen() {
       <TouchableOpacity 
         style={[
           styles.saveButton, 
+          settings.compactMode && styles.saveButtonCompact,
           existingOrder && editModeOrderId !== existingOrder.id && styles.saveButtonDisabled
         ]} 
         onPress={handleSaveOrder}
         disabled={existingOrder && editModeOrderId !== existingOrder.id}>
-        <Text style={styles.saveButtonText}>{editModeOrderId ? 'Save Edited Order' : 'Save Order'}</Text>
+        <Text style={[styles.saveButtonText, settings.compactMode && styles.textSmall]}>{editModeOrderId ? 'Save Edited Order' : 'Save Order'}</Text>
       </TouchableOpacity>
 
       <CreateItemModal
@@ -501,4 +504,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   dateDisplayText: { color: '#fff', fontSize: 16, fontWeight: '500' },
+  
+  // Compact Modifiers
+  sectionCompact: { padding: 10 },
+  inputCompact: { padding: 8, fontSize: 14, marginBottom: 5 },
+  searchRowCompact: { marginBottom: 5 },
+  addButtonCompact: { padding: 8 },
+  gridCompact: { gap: 6 },
+  gridItemCompact: { padding: 10 },
+  gridItemPersonCompact: { padding: 6 },
+  badgeCompact: { width: 18, height: 18, top: -4, right: -4 },
+  dateDisplayCompact: { paddingVertical: 4, paddingHorizontal: 8 },
+  cartRowCompact: { marginBottom: 6 },
+  saveButtonCompact: { padding: 12, margin: 8 },
+  textSmall: { fontSize: 14 },
+  textExtraSmall: { fontSize: 11 },
+  paddingSmall: { padding: 2 },
 });

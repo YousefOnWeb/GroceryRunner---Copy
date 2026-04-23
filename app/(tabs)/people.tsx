@@ -10,6 +10,7 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { useSettings } from '@/utils/settings';
 
 interface EditState {
   personId: string;
@@ -22,6 +23,7 @@ interface EditState {
 export default function PeopleScreen() {
   const { data: peopleList } = useLiveQuery(db.select().from(persons));
   const { data: allAliases } = useLiveQuery(db.select().from(personAliases));
+  const { settings } = useSettings();
 
   // Create person modal
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -119,16 +121,16 @@ export default function PeopleScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>Balances</Text>
+      <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
+        <View style={[styles.headerRow, settings.compactMode && styles.headerRowCompact]}>
+          <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>Balances</Text>
           <View style={styles.headerActions}>
-            <TouchableOpacity onPress={handleCopyPeople} style={styles.copyBtn}>
-              <FontAwesome name="copy" size={20} color="#2f95dc" />
+            <TouchableOpacity onPress={handleCopyPeople} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
+              <FontAwesome name="copy" size={settings.compactMode ? 16 : 20} color="#2f95dc" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.addBtn} onPress={() => setCreateModalVisible(true)}>
-              <FontAwesome name="plus" size={16} color="#fff" />
-              <Text style={styles.addBtnText}>Add Person</Text>
+            <TouchableOpacity style={[styles.addBtn, settings.compactMode && styles.addBtnCompact]} onPress={() => setCreateModalVisible(true)}>
+              <FontAwesome name="plus" size={settings.compactMode ? 12 : 16} color="#fff" />
+              <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Add Person</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -136,31 +138,31 @@ export default function PeopleScreen() {
         {peopleList?.map((person) => {
           const aliases = getAliasesForPerson(person.id);
           return (
-            <View key={person.id} style={styles.card}>
+            <View key={person.id} style={[styles.card, settings.compactMode && styles.cardCompact]}>
               <View style={styles.info}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.name}>{person.name}</Text>
-                  <TouchableOpacity onPress={() => handleEditPress(person)} style={styles.editBtn}>
-                    <FontAwesome name="pencil" size={18} color="#2f95dc" />
+                <View style={[styles.nameRow, settings.compactMode && styles.nameRowCompact]}>
+                  <Text style={[styles.name, settings.compactMode && styles.nameCompact]}>{person.name}</Text>
+                  <TouchableOpacity onPress={() => handleEditPress(person)} style={[styles.editBtn, settings.compactMode && styles.paddingSmall]}>
+                    <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
                   </TouchableOpacity>
                 </View>
                 {person.typicalPlace ? (
-                  <Text style={styles.place}>📍 {person.typicalPlace}</Text>
+                  <Text style={[styles.place, settings.compactMode && styles.textExtraSmall]}>📍 {person.typicalPlace}</Text>
                 ) : null}
                 {aliases.length > 0 ? (
-                  <Text style={styles.aliases}>
+                  <Text style={[styles.aliases, settings.compactMode && styles.textExtraSmall]}>
                     aka: {aliases.join(', ')}
                   </Text>
                 ) : null}
-                <View style={styles.balanceRow}>
-                  <Text style={[styles.balance, { color: getBalanceColor(person.balance, peopleWithUnknownPrices.has(person.id)) }]}>
+                <View style={[styles.balanceRow, settings.compactMode && styles.balanceRowCompact]}>
+                  <Text style={[styles.balance, settings.compactMode && styles.textSmall, { color: getBalanceColor(person.balance, peopleWithUnknownPrices.has(person.id)) }]}>
                     {getBalanceLabel(person.balance, peopleWithUnknownPrices.has(person.id))}
                   </Text>
                   {peopleWithUnknownPrices.has(person.id) && (
                     <TouchableOpacity
                       onPress={() => setUnknownPricePerson({ id: person.id, name: person.name })}
-                      style={styles.notesBtn}>
-                      <FontAwesome name="exclamation-circle" size={18} color="#ff9800" />
+                      style={[styles.notesBtn, settings.compactMode && styles.paddingSmall]}>
+                      <FontAwesome name="exclamation-circle" size={settings.compactMode ? 14 : 18} color="#ff9800" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -270,4 +272,17 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   emptyText: { color: '#888', fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
+  
+  // Compact Modifiers
+  contentCompact: { padding: 8 },
+  headerRowCompact: { marginBottom: 12 },
+  titleCompact: { fontSize: 20 },
+  addBtnCompact: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  cardCompact: { padding: 10, marginBottom: 8 },
+  nameRowCompact: { marginBottom: 2 },
+  nameCompact: { fontSize: 16 },
+  balanceRowCompact: { marginTop: 0 },
+  textSmall: { fontSize: 13 },
+  textExtraSmall: { fontSize: 11 },
+  paddingSmall: { padding: 2 },
 });

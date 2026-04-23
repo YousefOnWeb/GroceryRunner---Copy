@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface Settings {
   groupByFreshness: boolean;
+  compactMode: boolean;
   locationOrder: string[];
   sourceOrder: string[];
 }
@@ -14,6 +15,7 @@ interface SettingsContextType {
 
 const DEFAULT_SETTINGS: Settings = {
   groupByFreshness: false,
+  compactMode: false,
   locationOrder: [],
   sourceOrder: [],
 };
