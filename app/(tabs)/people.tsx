@@ -4,7 +4,7 @@ import CreditLogModal from '@/components/CreditLogModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
-import { orderItems, orders, personAliases, persons } from '@/db/schema';
+import { orderItems, orders, personAliases, persons, transactions } from '@/db/schema';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { and, eq, sql } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -89,6 +89,8 @@ export default function PeopleScreen() {
   const handleCopyPeople = async () => {
     if (!peopleList) return;
 
+    const allTx = await db.select().from(transactions).orderBy(sql`${transactions.date} DESC`);
+
     let text = `👥 PEOPLE & BALANCES SUMMARY\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
@@ -116,6 +118,24 @@ export default function PeopleScreen() {
       text += `${statusIcon} ${p.name}\n`;
       text += `   ${balText}\n`;
       if (p.typicalPlace) text += `   📍 ${p.typicalPlace}\n`;
+      
+      // Include Logs
+      const personTx = allTx.filter(tx => tx.personId === p.id);
+      if (personTx.length > 0) {
+        text += `   📜 Recent Logs:\n`;
+        personTx.slice(0, 5).forEach(tx => {
+          const d = new Date(tx.date);
+          const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const day = weekdays[d.getDay()];
+          const dateStr = `${day}, ${d.toLocaleDateString()}`;
+          const amountStr = tx.amount >= 0 ? `+$${tx.amount.toFixed(2)}` : `-$${Math.abs(tx.amount).toFixed(2)}`;
+          text += `     • ${dateStr}: ${amountStr} (${tx.note || tx.type})\n`;
+        });
+        if (personTx.length > 5) {
+          text += `     ... and ${personTx.length - 5} more transactions\n`;
+        }
+      }
+
       text += `\n`;
     });
 
