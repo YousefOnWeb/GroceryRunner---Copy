@@ -281,26 +281,35 @@ export const api = {
   },
 
   markItemUnpaid: async (itemId: string, personId: string, cost: number) => {
+    // 1. Fetch item name to match the note
     const itemInfo = await db.select({ name: items.name, qty: orderItems.quantity })
       .from(orderItems)
       .innerJoin(items, eq(orderItems.itemId, items.id))
       .where(eq(orderItems.id, itemId));
     const itemName = itemInfo.length > 0 ? `${itemInfo[0].qty}x ${itemInfo[0].name}` : 'Item';
+    const targetNote = `Paid: ${itemName}`;
 
+    // 2. Revert the balance (decrease it back)
     await db.update(orderItems).set({ isPaid: false }).where(eq(orderItems.id, itemId));
     if (cost > 0) {
       await db.update(persons)
         .set({ balance: sql`${persons.balance} - ${cost}` })
         .where(eq(persons.id, personId));
         
-      await db.insert(transactions).values({
-        id: generateId(),
-        personId,
-        amount: -cost,
-        date: new Date().toISOString(),
-        type: 'ManualAdjustment',
-        note: `Unpaid: ${itemName}`,
-      });
+      // 3. Find and delete the most recent "Paid" transaction for this item
+      const recentTx = await db.select({ id: transactions.id })
+        .from(transactions)
+        .where(and(
+          eq(transactions.personId, personId),
+          eq(transactions.type, 'PaymentReceived'),
+          eq(transactions.note, targetNote)
+        ))
+        .orderBy(sql`${transactions.date} DESC`)
+        .limit(1);
+
+      if (recentTx.length > 0) {
+        await db.delete(transactions).where(eq(transactions.id, recentTx[0].id));
+      }
     }
   },
 
@@ -352,6 +361,7 @@ export const api = {
     
     const orderInfo = await db.select({ date: orders.targetDate }).from(orders).where(eq(orders.id, orderId));
     const orderDate = orderInfo.length > 0 ? orderInfo[0].date : '';
+    const targetNote = `Settled entire order from ${orderDate}`;
 
     let totalPaidCost = 0;
     const idsToUpdate: string[] = [];
@@ -370,14 +380,20 @@ export const api = {
           .set({ balance: sql`${persons.balance} - ${totalPaidCost}` })
           .where(eq(persons.id, personId));
           
-        await db.insert(transactions).values({
-          id: generateId(),
-          personId,
-          amount: -totalPaidCost,
-          date: new Date().toISOString(),
-          type: 'ManualAdjustment',
-          note: `Reverted payment for order from ${orderDate}`,
-        });
+        // Find and delete the most recent "Settled" transaction for this order
+        const recentTx = await db.select({ id: transactions.id })
+          .from(transactions)
+          .where(and(
+            eq(transactions.personId, personId),
+            eq(transactions.type, 'PaymentReceived'),
+            eq(transactions.note, targetNote)
+          ))
+          .orderBy(sql`${transactions.date} DESC`)
+          .limit(1);
+
+        if (recentTx.length > 0) {
+          await db.delete(transactions).where(eq(transactions.id, recentTx[0].id));
+        }
       }
     }
   },
