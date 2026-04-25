@@ -523,4 +523,40 @@ export const api = {
     const res = await db.selectDistinct({ source: items.source }).from(items);
     return res.map(r => r.source).filter((s): s is string => s !== null && s.trim() !== '');
   },
+
+  getDistinctPlaces: async (): Promise<string[]> => {
+    const personPlaces = await db
+      .selectDistinct({ place: persons.typicalPlace })
+      .from(persons)
+      .where(sql`${persons.typicalPlace} IS NOT NULL AND ${persons.typicalPlace} != ''`);
+    
+    const orderPlaces = await db
+      .selectDistinct({ place: orders.deliveryPlace })
+      .from(orders)
+      .where(sql`${orders.deliveryPlace} IS NOT NULL AND ${orders.deliveryPlace} != ''`);
+
+    const all = new Set([
+      ...personPlaces.map(r => r.place).filter((s): s is string => s !== null),
+      ...orderPlaces.map(r => r.place).filter((s): s is string => s !== null),
+    ]);
+    
+    return Array.from(all);
+  },
+
+  deletePerson: async (id: string) => {
+    await db.delete(transactions).where(eq(transactions.personId, id));
+    const personOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.personId, id));
+    for (const order of personOrders) {
+      await api.deleteOrder(order.id);
+    }
+    await db.delete(persons).where(eq(persons.id, id));
+  },
+
+  deleteItem: async (id: string) => {
+    await db.delete(items).where(eq(items.id, id));
+  },
+
+  deleteOrder: async (orderId: string) => {
+    await db.delete(orders).where(eq(orders.id, orderId));
+  },
 };

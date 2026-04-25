@@ -1,6 +1,7 @@
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import DropdownSelect from '@/components/DropdownSelect';
 import UnknownPriceModal from '@/components/UnknownPriceModal';
+import CreditLogModal from '@/components/CreditLogModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
@@ -22,6 +23,9 @@ export default function TheRunScreen() {
 
   // Unknown price notes modal
   const [unknownPricePerson, setUnknownPricePerson] = useState<{ id: string; name: string } | null>(null);
+
+  // Credit log modal
+  const [logPerson, setLogPerson] = useState<{ id: string; name: string } | null>(null);
 
   // Collapsible states
   const [collapsedSources, setCollapsedSources] = useState<Record<string, boolean>>({});
@@ -493,9 +497,17 @@ export default function TheRunScreen() {
                             </TouchableOpacity>
                           )}
                         </View>
-                        <Text style={[po.person.balance < 0 ? styles.debt : po.person.balance > 0 ? styles.credit : po.hasUnknownPriceItems ? styles.pending : styles.settled, settings.compactMode && styles.personTotalCompact]}>
-                          ${Math.abs(po.person.balance).toFixed(2)}
-                        </Text>
+                        <View style={styles.balanceValueRow}>
+                          <Text style={[po.person.balance < 0 ? styles.debt : po.person.balance > 0 ? styles.credit : po.hasUnknownPriceItems ? styles.pending : styles.settled, settings.compactMode && styles.personTotalCompact]}>
+                            ${Math.abs(po.person.balance).toFixed(2)}
+                          </Text>
+                          <TouchableOpacity 
+                            onPress={() => setLogPerson({ id: po.person.id, name: po.person.name })}
+                            style={[styles.historyBtn, settings.compactMode && styles.paddingSmall]}
+                          >
+                            <FontAwesome name="history" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                       <View style={styles.buttonGroup}>
                         {po.hasUnpaidItems ? (
@@ -526,6 +538,15 @@ export default function TheRunScreen() {
           personId={unknownPricePerson.id}
           personName={unknownPricePerson.name}
           onClose={() => setUnknownPricePerson(null)}
+        />
+      )}
+
+      {logPerson && (
+        <CreditLogModal
+          visible={!!logPerson}
+          personId={logPerson.id}
+          personName={logPerson.name}
+          onClose={() => setLogPerson(null)}
         />
       )}
     </KeyboardAvoidingView>
@@ -608,6 +629,8 @@ const styles = StyleSheet.create({
   personItemPaid: { textDecorationLine: 'line-through', color: '#666' },
   personFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#555', paddingTop: 10 },
   balanceHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  balanceValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  historyBtn: { padding: 4 },
   balanceLabel: { fontSize: 12, fontWeight: '600', marginBottom: 3 },
   notesBtn: { padding: 4 },
   debtLabel: { color: '#ff4444' },

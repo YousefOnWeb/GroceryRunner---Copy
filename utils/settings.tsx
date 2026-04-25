@@ -15,7 +15,7 @@ interface SettingsContextType {
 
 const DEFAULT_SETTINGS: Settings = {
   groupByFreshness: false,
-  compactMode: false,
+  compactMode: true,
   locationOrder: [],
   sourceOrder: [],
 };

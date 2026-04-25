@@ -1,5 +1,6 @@
 import PersonModal from '@/components/PersonModal';
 import UnknownPriceModal from '@/components/UnknownPriceModal';
+import CreditLogModal from '@/components/CreditLogModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
@@ -34,6 +35,9 @@ export default function PeopleScreen() {
 
   // Unknown price notes modal
   const [unknownPricePerson, setUnknownPricePerson] = useState<{ id: string; name: string } | null>(null);
+
+  // Credit log modal
+  const [logPerson, setLogPerson] = useState<{ id: string; name: string } | null>(null);
 
   const { data: unpaidUnknownPriceItems } = useLiveQuery(
     db.select({ personId: orders.personId })
@@ -142,9 +146,14 @@ export default function PeopleScreen() {
               <View style={styles.info}>
                 <View style={[styles.nameRow, settings.compactMode && styles.nameRowCompact]}>
                   <Text style={[styles.name, settings.compactMode && styles.nameCompact]}>{person.name}</Text>
-                  <TouchableOpacity onPress={() => handleEditPress(person)} style={[styles.editBtn, settings.compactMode && styles.paddingSmall]}>
-                    <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
-                  </TouchableOpacity>
+                  <View style={styles.personActions}>
+                    <TouchableOpacity onPress={() => setLogPerson({ id: person.id, name: person.name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
+                      <FontAwesome name="history" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleEditPress(person)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
+                      <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 {person.typicalPlace ? (
                   <Text style={[styles.place, settings.compactMode && styles.textExtraSmall]}>📍 {person.typicalPlace}</Text>
@@ -207,6 +216,16 @@ export default function PeopleScreen() {
           onClose={() => setUnknownPricePerson(null)}
         />
       )}
+      
+      {/* Credit Log Modal */}
+      {logPerson && (
+        <CreditLogModal
+          visible={!!logPerson}
+          personId={logPerson.id}
+          personName={logPerson.name}
+          onClose={() => setLogPerson(null)}
+        />
+      )}
     </View>
   );
 }
@@ -247,7 +266,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   name: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  editBtn: {
+  personActions: { flexDirection: 'row', gap: 12 },
+  iconBtn: {
     padding: 6,
   },
   place: {
