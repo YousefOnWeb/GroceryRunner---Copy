@@ -40,7 +40,7 @@ export default function TheRunScreen() {
 
   const { aggregatedItems, peopleOrders } = useMemo(() => {
     const agg: Record<string, { item: any; totalQuantity: number; totalCost: number }> = {};
-    const pOrders: Record<string, { person: any; order: any; items: any[]; totalCost: number; unpaidCost: number }> = {};
+    const pOrders: Record<string, { person: any; order: any; items: any[]; totalCost: number; unpaidCost: number; hasUnpaidItems: boolean; hasUnknownPriceItems: boolean; deliveryPlace: string | null }> = {};
 
     if (!allOrders || !allOrderItems || !catalog || !people) {
       return { aggregatedItems: {}, peopleOrders: [] };

@@ -12,6 +12,8 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { useSettings } from '@/utils/settings';
+import SmartTextInput from '@/components/SmartTextInput';
+import { COMMON_GROCERY_CORPUS, COMMON_NAMES_CORPUS } from '@/utils/textMatching';
 
 export default function AddOrderScreen() {
   const { data: people } = useLiveQuery(db.select().from(persons));
@@ -46,6 +48,17 @@ export default function AddOrderScreen() {
     if (!allOrders || !selectedPersonId) return null;
     return allOrders.find(o => o.personId === selectedPersonId && o.targetDate === targetDateDb);
   }, [allOrders, selectedPersonId, targetDateDb]);
+
+  const personCorpus = useMemo(() => {
+    const dbNames = people?.map(p => p.name) || [];
+    const dbAliases = allAliases?.map(a => a.alias) || [];
+    return [...new Set([...dbNames, ...dbAliases, ...COMMON_NAMES_CORPUS])];
+  }, [people, allAliases]);
+
+  const itemCorpus = useMemo(() => {
+    const dbItems = catalog?.map(i => i.name) || [];
+    return [...new Set([...dbItems, ...COMMON_GROCERY_CORPUS])];
+  }, [catalog]);
 
   const loadExistingOrder = () => {
     if (!existingOrder || !allOrderItems || !catalog) return;
@@ -234,12 +247,14 @@ export default function AddOrderScreen() {
           ) : (
             <>
               <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
-                <TextInput
+                <SmartTextInput
                   style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
                   value={personSearchQuery}
                   onChangeText={setPersonSearchQuery}
                   placeholder="Search person or nickname..."
                   placeholderTextColor="#888"
+                  corpus={personCorpus}
+                  compactMode={settings.compactMode}
                 />
                 {personSearchQuery.trim().length > 0 && !exactPersonMatch && (
                   <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setPersonModalVisible(true)}>
@@ -315,12 +330,14 @@ export default function AddOrderScreen() {
             3. What do they want? {editModeOrderId && <Text style={{color: '#ff9800'}}>(Editing)</Text>}
           </Text>
           <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
-            <TextInput
+            <SmartTextInput
               style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search or add item..."
               placeholderTextColor="#888"
+              corpus={itemCorpus}
+              compactMode={settings.compactMode}
             />
             {searchQuery.trim().length > 0 && !exactItemMatch && (
               <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setItemModalVisible(true)}>

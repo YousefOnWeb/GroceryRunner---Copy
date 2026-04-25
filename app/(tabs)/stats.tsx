@@ -8,6 +8,7 @@ import { persons, items, orderItems, orders } from '@/db/schema';
 import { api } from '@/db/api';
 import CreateItemModal from '@/components/CreateItemModal';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import SmartTextInput from '@/components/SmartTextInput';
 
 export default function StatsScreen() {
   const { data: peopleList } = useLiveQuery(db.select().from(persons));
@@ -18,6 +19,10 @@ export default function StatsScreen() {
 
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [itemSearch, setItemSearch] = useState('');
+
+  const itemCorpus = useMemo(() => {
+    return catalog?.map(i => i.name) || [];
+  }, [catalog]);
 
   const stats = useMemo(() => {
     if (!peopleList || !catalog || !allOrders || !allOrderItems) return null;
@@ -122,12 +127,14 @@ export default function StatsScreen() {
         {/* ITEMS DICTIONARY SECTION */}
         <View style={styles.dictionaryHeader}>
           <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>📖 Items Dictionary</Text>
-          <TextInput
+          <SmartTextInput
             style={[styles.dictionarySearch, settings.compactMode && styles.dictionarySearchCompact]}
             value={itemSearch}
             onChangeText={setItemSearch}
             placeholder="Search items..."
             placeholderTextColor="#888"
+            corpus={itemCorpus}
+            compactMode={settings.compactMode}
           />
         </View>
         <Text style={[styles.helperText, settings.compactMode && styles.textExtraSmall]}>Update default prices, sources, and timing for your items here.</Text>

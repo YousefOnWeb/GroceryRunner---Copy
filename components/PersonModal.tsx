@@ -5,6 +5,10 @@ import { Alert, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSettings } from '@/utils/settings';
 import CreditLogModal from './CreditLogModal';
+import SmartTextInput from './SmartTextInput';
+import { COMMON_NAMES_CORPUS } from '@/utils/textMatching';
+import { db } from '@/db';
+import { persons } from '@/db/schema';
 
 interface PersonModalProps {
   visible: boolean;
@@ -42,6 +46,7 @@ export default function PersonModal({
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustNote, setAdjustNote] = useState('');
   const [logVisible, setLogVisible] = useState(false);
+  const [namesCorpus, setNamesCorpus] = useState<string[]>(COMMON_NAMES_CORPUS);
   const { settings } = useSettings();
 
   const initialAliasesKey = JSON.stringify(initialAliases);
@@ -56,8 +61,19 @@ export default function PersonModal({
       setAdjustAmount('');
       setAdjustNote('');
       loadPlaceSuggestions();
+      loadCorpus();
     }
   }, [visible, initialName, initialPlace, initialAliasesKey]);
+
+  const loadCorpus = async () => {
+    try {
+      const dbPersons = await db.select({ name: persons.name }).from(persons);
+      const names = dbPersons.map(p => p.name);
+      setNamesCorpus([...new Set([...names, ...COMMON_NAMES_CORPUS])]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const loadPlaceSuggestions = async () => {
     try {
@@ -165,12 +181,14 @@ export default function PersonModal({
 
           {/* Name */}
           <Text style={styles.label}>Name</Text>
-          <TextInput
+          <SmartTextInput
             style={styles.input}
             value={name}
             onChangeText={setName}
             placeholder="Primary name"
             placeholderTextColor="#888"
+            corpus={namesCorpus}
+            compactMode={settings.compactMode}
           />
 
           {/* Typical Place */}
@@ -216,7 +234,7 @@ export default function PersonModal({
             </View>
           ))}
           <View style={styles.addAliasRow}>
-            <TextInput
+            <SmartTextInput
               style={[styles.input, { flex: 1, marginBottom: 0 }]}
               value={newAlias}
               onChangeText={setNewAlias}
@@ -224,6 +242,8 @@ export default function PersonModal({
               placeholderTextColor="#888"
               onSubmitEditing={addAlias}
               returnKeyType="done"
+              corpus={namesCorpus}
+              compactMode={settings.compactMode}
             />
             <TouchableOpacity
               style={[styles.addAliasBtn, !newAlias.trim() && { opacity: 0.4 }]}

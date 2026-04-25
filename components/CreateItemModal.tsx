@@ -5,6 +5,10 @@ import { Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Alert
 import DropdownSelect from './DropdownSelect';
 import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import SmartTextInput from './SmartTextInput';
+import { COMMON_GROCERY_CORPUS } from '@/utils/textMatching';
+import { db } from '@/db';
+import { items } from '@/db/schema';
 
 interface CreateItemModalProps {
   visible: boolean;
@@ -37,6 +41,7 @@ export default function CreateItemModal({
   const [distinctSources, setDistinctSources] = useState<string[]>([]);
   const [timing, setTiming] = useState<'Fresh' | 'Anytime'>(initialTiming);
   const [isCorrection, setIsCorrection] = useState(false);
+  const [itemCorpus, setItemCorpus] = useState<string[]>(COMMON_GROCERY_CORPUS);
   const { settings } = useSettings();
 
   useEffect(() => {
@@ -49,8 +54,19 @@ export default function CreateItemModal({
       loadDistinctSources();
       setTiming(initialTiming);
       setIsCorrection(false);
+      loadCorpus();
     }
   }, [visible, initialName, initialPrice, initialSource, initialTiming]);
+
+  const loadCorpus = async () => {
+    try {
+      const dbItems = await db.select({ name: items.name }).from(items);
+      const names = dbItems.map(i => i.name);
+      setItemCorpus([...new Set([...names, ...COMMON_GROCERY_CORPUS])]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const loadDistinctSources = async () => {
     try {
@@ -99,12 +115,14 @@ export default function CreateItemModal({
           <Text style={styles.title}>{title}</Text>
           
           <Text style={styles.label}>Item Name</Text>
-          <TextInput
+          <SmartTextInput
             style={styles.input}
             value={name}
             onChangeText={setName}
             placeholder="e.g. Milk"
             placeholderTextColor="#888"
+            corpus={itemCorpus}
+            compactMode={settings.compactMode}
           />
 
           <Text style={styles.label}>Default Price (Optional)</Text>
