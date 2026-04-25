@@ -174,11 +174,16 @@ export const api = {
         amount: -totalCost,
         date: new Date().toISOString(),
         type: 'OrderCost',
+        note: `Order for ${targetDate}`,
       });
     }
   },
 
   updateOrder: async (orderId: string, personId: string, newOrderLines: { itemId: string, quantity: number, unitPrice: number | null }[], deliveryPlace?: string | null) => {
+    // Fetch targetDate for note
+    const orderInfo = await db.select({ date: orders.targetDate }).from(orders).where(eq(orders.id, orderId));
+    const targetDate = orderInfo.length > 0 ? orderInfo[0].date : '';
+
     // 1. Fetch old unpaid items to revert their debt
     const oldItems = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
     let oldUnpaidCost = 0;
@@ -193,6 +198,15 @@ export const api = {
       await db.update(persons)
         .set({ balance: sql`${persons.balance} + ${oldUnpaidCost}` })
         .where(eq(persons.id, personId));
+      
+      await db.insert(transactions).values({
+        id: generateId(),
+        personId,
+        amount: oldUnpaidCost,
+        date: new Date().toISOString(),
+        type: 'ManualAdjustment',
+        note: `Reverted old items for edited order (${targetDate})`,
+      });
     }
 
     // 2. Delete old items
@@ -222,6 +236,15 @@ export const api = {
       await db.update(persons)
         .set({ balance: sql`${persons.balance} - ${newTotalCost}` })
         .where(eq(persons.id, personId));
+
+      await db.insert(transactions).values({
+        id: generateId(),
+        personId,
+        amount: -newTotalCost,
+        date: new Date().toISOString(),
+        type: 'OrderCost',
+        note: `Updated items for order (${targetDate})`,
+      });
     }
     
     // Update deliveryPlace and set order to unpaid
@@ -233,6 +256,13 @@ export const api = {
   },
 
   markItemPaid: async (itemId: string, personId: string, cost: number) => {
+    // Fetch item name for note
+    const itemInfo = await db.select({ name: items.name, qty: orderItems.quantity })
+      .from(orderItems)
+      .innerJoin(items, eq(orderItems.itemId, items.id))
+      .where(eq(orderItems.id, itemId));
+    const itemName = itemInfo.length > 0 ? `${itemInfo[0].qty}x ${itemInfo[0].name}` : 'Item';
+
     await db.update(orderItems).set({ isPaid: true }).where(eq(orderItems.id, itemId));
     if (cost > 0) {
       await db.update(persons)
@@ -245,11 +275,18 @@ export const api = {
         amount: cost,
         date: new Date().toISOString(),
         type: 'PaymentReceived',
+        note: `Paid: ${itemName}`,
       });
     }
   },
 
   markItemUnpaid: async (itemId: string, personId: string, cost: number) => {
+    const itemInfo = await db.select({ name: items.name, qty: orderItems.quantity })
+      .from(orderItems)
+      .innerJoin(items, eq(orderItems.itemId, items.id))
+      .where(eq(orderItems.id, itemId));
+    const itemName = itemInfo.length > 0 ? `${itemInfo[0].qty}x ${itemInfo[0].name}` : 'Item';
+
     await db.update(orderItems).set({ isPaid: false }).where(eq(orderItems.id, itemId));
     if (cost > 0) {
       await db.update(persons)
@@ -262,6 +299,7 @@ export const api = {
         amount: -cost,
         date: new Date().toISOString(),
         type: 'ManualAdjustment',
+        note: `Unpaid: ${itemName}`,
       });
     }
   },
@@ -271,6 +309,9 @@ export const api = {
       and(eq(orderItems.orderId, orderId), eq(orderItems.isPaid, false))
     );
     
+    const orderInfo = await db.select({ date: orders.targetDate }).from(orders).where(eq(orders.id, orderId));
+    const orderDate = orderInfo.length > 0 ? orderInfo[0].date : '';
+
     let totalUnpaidCost = 0;
     const idsToUpdate: string[] = [];
     
@@ -294,13 +335,13 @@ export const api = {
           amount: totalUnpaidCost,
           date: new Date().toISOString(),
           type: 'PaymentReceived',
+          note: `Settled entire order from ${orderDate}`,
         });
       }
     }
   },
 
   markOrderPaid: async (orderId: string, personId: string) => {
-    // Alias for markAllPaid for backward compatibility
     return api.markAllPaid(orderId, personId);
   },
 
@@ -309,6 +350,9 @@ export const api = {
       and(eq(orderItems.orderId, orderId), eq(orderItems.isPaid, true))
     );
     
+    const orderInfo = await db.select({ date: orders.targetDate }).from(orders).where(eq(orders.id, orderId));
+    const orderDate = orderInfo.length > 0 ? orderInfo[0].date : '';
+
     let totalPaidCost = 0;
     const idsToUpdate: string[] = [];
     
@@ -332,13 +376,13 @@ export const api = {
           amount: -totalPaidCost,
           date: new Date().toISOString(),
           type: 'ManualAdjustment',
+          note: `Reverted payment for order from ${orderDate}`,
         });
       }
     }
   },
 
-  changeBalance: async (personId: string, amount: number) => {
-    // Positive amount increases credit, negative decreases credit
+  changeBalance: async (personId: string, amount: number, note: string) => {
     await db.update(persons)
       .set({ balance: sql`${persons.balance} + ${amount}` })
       .where(eq(persons.id, personId));
@@ -349,15 +393,15 @@ export const api = {
       amount,
       date: new Date().toISOString(),
       type: 'ManualAdjustment',
+      note: note.trim(),
     });
   },
 
-  settleBalance: async (personId: string, amount: number) => {
-    // Alias for changeBalance
-    return api.changeBalance(personId, amount);
+  settleBalance: async (personId: string, amount: number, note: string) => {
+    return api.changeBalance(personId, amount, note);
   },
   
-  updateItem: async (id: string, updates: Partial<{ name: string; defaultPrice: number | null; source: string | null; timing: 'Fresh' | 'Anytime' }>) => {
+  updateItem: async (id: string, updates: Partial<{ name: string; defaultPrice: number | null; source: string | null; timing: 'Fresh' | 'Anytime' }>, isCorrection: boolean = false) => {
     let finalSource = updates.source?.trim() || null;
     if (finalSource) {
       const existingSources = await db.select().from(items).where(sql`lower(source) = lower(${finalSource})`);
@@ -368,99 +412,94 @@ export const api = {
     const finalUpdates = { ...updates, source: finalSource };
     if (updates.name) finalUpdates.name = updates.name.trim();
 
+    // Fetch name for log before update
+    const oldItem = await db.select({ name: items.name }).from(items).where(eq(items.id, id));
+    const itemName = oldItem.length > 0 ? oldItem[0].name : 'Item';
+
     await db.update(items).set(finalUpdates).where(eq(items.id, id));
 
-    // If defaultPrice was updated from null to a value, or just updated, 
-    // sync it with orders that were waiting for a price (unitPrice is NULL).
-    if (updates.defaultPrice !== undefined && updates.defaultPrice !== null) {
+    if (updates.defaultPrice !== undefined) {
       const newPrice = updates.defaultPrice;
       
-      // Find all order items with NULL price for this item
-      const pendingItems = await db.select({
-        oiId: orderItems.id,
-        quantity: orderItems.quantity,
-        personId: orders.personId,
-        orderId: orders.id,
-        isPaid: orderItems.isPaid,
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .where(and(
-        eq(orderItems.itemId, id),
-        sql`${orderItems.unitPrice} IS NULL`
-      ));
+      if (isCorrection && newPrice !== null) {
+        const allInstances = await db.select({
+          oiId: orderItems.id,
+          quantity: orderItems.quantity,
+          unitPrice: orderItems.unitPrice,
+          personId: orders.personId,
+          orderId: orders.id,
+          isPaid: orderItems.isPaid,
+        })
+        .from(orderItems)
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(eq(orderItems.itemId, id));
 
-      for (const item of pendingItems) {
-        const addedDebt = item.quantity * newPrice;
-        
-        // Update the order item price
-        await db.update(orderItems)
-          .set({ unitPrice: newPrice })
-          .where(eq(orderItems.id, item.oiId));
+        for (const item of allInstances) {
+          const oldPrice = item.unitPrice ?? 0;
+          const diff = (newPrice - oldPrice) * item.quantity;
 
-        // If the item hasn't been paid for yet, update the person's balance
-        if (!item.isPaid) {
-          await db.update(persons)
-            .set({ balance: sql`${persons.balance} - ${addedDebt}` })
-            .where(eq(persons.id, item.personId));
+          if (diff !== 0) {
+            await db.update(orderItems)
+              .set({ unitPrice: newPrice })
+              .where(eq(orderItems.id, item.oiId));
 
-          await db.insert(transactions).values({
-            id: generateId(),
-            personId: item.personId,
-            amount: -addedDebt,
-            date: new Date().toISOString(),
-            type: 'OrderCost', // Or a new type like 'PriceUpdate'
-          });
+            await db.update(persons)
+              .set({ balance: sql`${persons.balance} - ${diff}` })
+              .where(eq(persons.id, item.personId));
+
+            await db.insert(transactions).values({
+              id: generateId(),
+              personId: item.personId,
+              amount: -diff,
+              date: new Date().toISOString(),
+              type: 'ManualAdjustment',
+              note: `Price correction for ${itemName}: $${oldPrice} -> $${newPrice}`,
+            });
+          }
+        }
+      } else if (newPrice !== null) {
+        const pendingItems = await db.select({
+          oiId: orderItems.id,
+          quantity: orderItems.quantity,
+          personId: orders.personId,
+          orderId: orders.id,
+          isPaid: orderItems.isPaid,
+        })
+        .from(orderItems)
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(and(
+          eq(orderItems.itemId, id),
+          sql`${orderItems.unitPrice} IS NULL`
+        ));
+
+        for (const item of pendingItems) {
+          const addedDebt = item.quantity * newPrice;
+          
+          await db.update(orderItems)
+            .set({ unitPrice: newPrice })
+            .where(eq(orderItems.id, item.oiId));
+
+          if (!item.isPaid) {
+            await db.update(persons)
+              .set({ balance: sql`${persons.balance} - ${addedDebt}` })
+              .where(eq(persons.id, item.personId));
+
+            await db.insert(transactions).values({
+              id: generateId(),
+              personId: item.personId,
+              amount: -addedDebt,
+              date: new Date().toISOString(),
+              type: 'OrderCost',
+              note: `Price finalized for ${itemName}`,
+            });
+          }
         }
       }
     }
   },
 
-  getDistinctSources: async (): Promise<string[]> => {
-    const rows = await db
-      .selectDistinct({ source: items.source })
-      .from(items)
-      .where(sql`${items.source} IS NOT NULL AND ${items.source} != ''`);
-    return rows.map(r => r.source).filter((s): s is string => s !== null);
-  },
-
-  getDistinctPlaces: async (): Promise<string[]> => {
-    const personPlaces = await db
-      .selectDistinct({ place: persons.typicalPlace })
-      .from(persons)
-      .where(sql`${persons.typicalPlace} IS NOT NULL AND ${persons.typicalPlace} != ''`);
-    
-    const orderPlaces = await db
-      .selectDistinct({ place: orders.deliveryPlace })
-      .from(orders)
-      .where(sql`${orders.deliveryPlace} IS NOT NULL AND ${orders.deliveryPlace} != ''`);
-
-    const all = new Set([
-      ...personPlaces.map(r => r.place).filter((s): s is string => s !== null),
-      ...orderPlaces.map(r => r.place).filter((s): s is string => s !== null),
-    ]);
-    
-    return Array.from(all);
-  },
-
-  deletePerson: async (id: string) => {
-    await db.delete(transactions).where(eq(transactions.personId, id));
-    const personOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.personId, id));
-    for (const order of personOrders) {
-      await api.deleteOrder(order.id);
-    }
-    await db.delete(persons).where(eq(persons.id, id));
-  },
-
-  deleteItem: async (id: string) => {
-    // Check if item is used in any orders first? Or just delete?
-    // Let's just delete, foreign keys might block if not handled.
-    await db.delete(items).where(eq(items.id, id));
-  },
-
-  deleteOrder: async (orderId: string) => {
-    // orderItems will be deleted by cascade
-    await db.delete(orders).where(eq(orders.id, orderId));
+  getTransactionsForPerson: async (personId: string) => {
+    return db.select().from(transactions).where(eq(transactions.personId, personId)).orderBy(sql`${transactions.date} DESC`);
   },
 
   getUnpaidUnknownPriceItems: async (personId: string) => {

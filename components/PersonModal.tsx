@@ -3,6 +3,8 @@ import { api } from '@/db/api';
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useSettings } from '@/utils/settings';
+import CreditLogModal from './CreditLogModal';
 
 interface PersonModalProps {
   visible: boolean;
@@ -38,6 +40,9 @@ export default function PersonModal({
   // Credit adjustment (edit mode only)
   const [adjustType, setAdjustType] = useState<'increase' | 'decrease' | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
+  const [adjustNote, setAdjustNote] = useState('');
+  const [logVisible, setLogVisible] = useState(false);
+  const { settings } = useSettings();
 
   const initialAliasesKey = JSON.stringify(initialAliases);
 
@@ -49,6 +54,7 @@ export default function PersonModal({
       setNewAlias('');
       setAdjustType(null);
       setAdjustAmount('');
+      setAdjustNote('');
       loadPlaceSuggestions();
     }
   }, [visible, initialName, initialPlace, initialAliasesKey]);
@@ -107,8 +113,12 @@ export default function PersonModal({
         if (adjustType && adjustAmount) {
           const amount = parseFloat(adjustAmount);
           if (!isNaN(amount) && amount > 0) {
+            if (!adjustNote.trim()) {
+              Alert.alert('Note Required', 'Please enter a note for this manual credit adjustment.');
+              return;
+            }
             const finalAmount = adjustType === 'increase' ? amount : -amount;
-            await api.changeBalance(personId, finalAmount);
+            await api.changeBalance(personId, finalAmount, adjustNote.trim());
           }
         }
 
@@ -149,7 +159,7 @@ export default function PersonModal({
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
         <ScrollView style={styles.dialog} contentContainerStyle={styles.dialogContent} keyboardShouldPersistTaps="handled">
-          <Text style={styles.title}>
+          <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>
             {mode === 'create' ? 'Add New Person' : `Edit: ${initialName}`}
           </Text>
 
@@ -246,39 +256,63 @@ export default function PersonModal({
                 </TouchableOpacity>
               </View>
               {adjustType && (
-                <TextInput
-                  style={styles.input}
-                  value={adjustAmount}
-                  onChangeText={setAdjustAmount}
-                  placeholder="Amount (e.g. 50)"
-                  placeholderTextColor="#888"
-                  keyboardType="numeric"
-                />
+                <>
+                  <TextInput
+                    style={[styles.input, settings.compactMode && styles.inputCompact]}
+                    value={adjustAmount}
+                    onChangeText={setAdjustAmount}
+                    placeholder="Amount (e.g. 50)"
+                    placeholderTextColor="#888"
+                    keyboardType="numeric"
+                  />
+                  <TextInput
+                    style={[styles.input, settings.compactMode && styles.inputCompact]}
+                    value={adjustNote}
+                    onChangeText={setAdjustNote}
+                    placeholder="Note for this adjustment..."
+                    placeholderTextColor="#888"
+                  />
+                </>
               )}
+              
+              <TouchableOpacity 
+                style={[styles.logLinkBtn, settings.compactMode && styles.logLinkBtnCompact]} 
+                onPress={() => setLogVisible(true)}
+              >
+                <FontAwesome name="history" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+                <Text style={[styles.logLinkText, settings.compactMode && styles.textSmall]}>View Credit Log / Transaction History</Text>
+              </TouchableOpacity>
             </>
           )}
 
           {/* Action Buttons */}
-          <View style={styles.buttonRow}>
+          <View style={[styles.buttonRow, settings.compactMode && styles.buttonRowCompact]}>
             {mode === 'edit' && (
               <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-                <FontAwesome name="trash" size={18} color="#ff4444" />
-                <Text style={styles.deleteBtnText}>Delete</Text>
+                <FontAwesome name="trash" size={settings.compactMode ? 14 : 18} color="#ff4444" />
+                <Text style={[styles.deleteBtnText, settings.compactMode && styles.textSmall]}>Delete</Text>
               </TouchableOpacity>
             )}
             <View style={{ flex: 1 }} />
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }]}
+              style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }, settings.compactMode && styles.submitBtnCompact]}
               onPress={handleSubmit}
               disabled={!name.trim()}>
-              <Text style={styles.submitBtnText}>{mode === 'create' ? 'Add Person' : 'Save Changes'}</Text>
+              <Text style={[styles.submitBtnText, settings.compactMode && styles.textSmall]}>{mode === 'create' ? 'Add Person' : 'Save Changes'}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
+
+      <CreditLogModal 
+        visible={logVisible} 
+        personId={personId || ''} 
+        personName={name} 
+        onClose={() => setLogVisible(false)} 
+      />
     </Modal>
   );
 }
@@ -448,4 +482,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  logLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  logLinkBtnCompact: {
+    marginTop: 10,
+    padding: 8,
+  },
+  logLinkText: {
+    color: '#2f95dc',
+    fontWeight: '600',
+  },
+  titleCompact: { fontSize: 18, marginBottom: 12 },
+  inputCompact: { padding: 8, fontSize: 14, marginBottom: 4 },
+  buttonRowCompact: { marginTop: 10 },
+  submitBtnCompact: { paddingVertical: 8, paddingHorizontal: 15 },
+  textSmall: { fontSize: 14 },
+  textExtraSmall: { fontSize: 11 },
 });

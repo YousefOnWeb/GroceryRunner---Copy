@@ -44,4 +44,5 @@ export const transactions = sqliteTable('transactions', {
   amount: real('amount').notNull(),
   date: text('date').notNull(), // ISO datetime
   type: text('type', { enum: ['PaymentReceived', 'OrderCost', 'ManualAdjustment'] }).notNull(),
+  note: text('note'),
 });

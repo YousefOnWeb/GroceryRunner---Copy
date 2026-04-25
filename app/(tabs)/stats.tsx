@@ -61,14 +61,14 @@ export default function StatsScreen() {
     setEditingItem(item);
   };
 
-  const handleSaveItem = async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime') => {
+  const handleSaveItem = async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', isCorrection: boolean) => {
     if (!editingItem) return;
     await api.updateItem(editingItem.id, {
       name,
       defaultPrice,
       source,
       timing,
-    });
+    }, isCorrection);
     setEditingItem(null);
   };
 

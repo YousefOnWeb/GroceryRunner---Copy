@@ -1,8 +1,10 @@
 import { Text } from '@/components/Themed';
 import { api } from '@/db/api';
 import React, { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import DropdownSelect from './DropdownSelect';
+import { useSettings } from '@/utils/settings';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 interface CreateItemModalProps {
   visible: boolean;
@@ -13,7 +15,7 @@ interface CreateItemModalProps {
   initialSource?: string | null;
   initialTiming?: 'Fresh' | 'Anytime';
   onCancel: () => void;
-  onSubmit: (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime') => void;
+  onSubmit: (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', isCorrection: boolean) => void;
 }
 
 export default function CreateItemModal({
@@ -34,6 +36,8 @@ export default function CreateItemModal({
   const [showSourceSuggestions, setShowSourceSuggestions] = useState(false);
   const [distinctSources, setDistinctSources] = useState<string[]>([]);
   const [timing, setTiming] = useState<'Fresh' | 'Anytime'>(initialTiming);
+  const [isCorrection, setIsCorrection] = useState(false);
+  const { settings } = useSettings();
 
   useEffect(() => {
     if (visible) {
@@ -44,6 +48,7 @@ export default function CreateItemModal({
       setShowSourceSuggestions(false);
       loadDistinctSources();
       setTiming(initialTiming);
+      setIsCorrection(false);
     }
   }, [visible, initialName, initialPrice, initialSource, initialTiming]);
 
@@ -73,9 +78,19 @@ export default function CreateItemModal({
       name,
       isNaN(price) ? null : price,
       finalSource,
-      timing
+      timing,
+      isCorrection
     );
   };
+
+  const showPriceHelp = () => {
+    Alert.alert(
+      'Price Update Modes',
+      '• Market Change (Default): Only sets the price for new orders. Past orders stay the same (except those that had no price set).\n\n• Price Correction: Updates this price in ALL past orders. Useful for fixing mistakes. This will also adjust people\'s current balances accordingly.'
+    );
+  };
+
+  const isEditMode = title.toLowerCase().includes('edit');
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -128,8 +143,8 @@ export default function CreateItemModal({
             </View>
           )}
 
-          <Text style={styles.label}>Timing</Text>
-          <View style={styles.dropdownContainer}>
+          <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Timing</Text>
+          <View style={[styles.dropdownContainer, settings.compactMode && styles.dropdownContainerCompact]}>
             <DropdownSelect
               value={timing}
               options={['Fresh', 'Anytime']}
@@ -137,15 +152,48 @@ export default function CreateItemModal({
             />
           </View>
 
-          <View style={styles.buttonRow}>
+          {isEditMode && (
+            <View style={[styles.correctionSection, settings.compactMode && styles.correctionSectionCompact]}>
+              <View style={styles.correctionHeader}>
+                <Text style={[styles.label, { marginTop: 0 }, settings.compactMode && styles.textExtraSmall]}>Update Mode</Text>
+                <TouchableOpacity onPress={showPriceHelp} style={styles.helpBtn}>
+                  <FontAwesome name="question-circle" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.modeToggleRow}>
+                <TouchableOpacity 
+                  style={[
+                    styles.modeBtn, 
+                    !isCorrection && styles.modeBtnActive,
+                    settings.compactMode && styles.modeBtnCompact
+                  ]} 
+                  onPress={() => setIsCorrection(false)}
+                >
+                  <Text style={[styles.modeBtnText, !isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Market Change</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[
+                    styles.modeBtn, 
+                    isCorrection && styles.modeBtnActiveCorrection,
+                    settings.compactMode && styles.modeBtnCompact
+                  ]} 
+                  onPress={() => setIsCorrection(true)}
+                >
+                  <Text style={[styles.modeBtnText, isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Correction</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          <View style={[styles.buttonRow, settings.compactMode && styles.buttonRowCompact]}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }]}
+              style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }, settings.compactMode && styles.submitBtnCompact]}
               onPress={handleSubmit}
               disabled={!name.trim()}>
-              <Text style={styles.submitBtnText}>{submitLabel}</Text>
+              <Text style={[styles.submitBtnText, settings.compactMode && styles.textSmall]}>{submitLabel}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -241,4 +289,68 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  correctionSection: {
+    backgroundColor: '#1a1a1a',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  correctionSectionCompact: {
+    padding: 8,
+    marginTop: 5,
+  },
+  correctionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  helpBtn: {
+    padding: 2,
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#444',
+    alignItems: 'center',
+  },
+  modeBtnCompact: {
+    paddingVertical: 6,
+  },
+  modeBtnActive: {
+    backgroundColor: '#333',
+    borderColor: '#2f95dc',
+  },
+  modeBtnActiveCorrection: {
+    backgroundColor: '#333',
+    borderColor: '#ff9800',
+  },
+  modeBtnText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modeBtnTextActive: {
+    color: '#fff',
+  },
+  dropdownContainerCompact: {
+    marginBottom: 5,
+  },
+  buttonRowCompact: {
+    marginTop: 10,
+  },
+  submitBtnCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+  },
+  textSmall: { fontSize: 14 },
+  textExtraSmall: { fontSize: 11 },
 });

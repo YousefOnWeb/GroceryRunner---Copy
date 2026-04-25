@@ -142,7 +142,7 @@ export default function AddOrderScreen() {
     }
   };
 
-  const handleCreateItemSubmit = async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime') => {
+  const handleCreateItemSubmit = async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', isCorrection: boolean) => {
     setItemModalVisible(false);
     try {
       const newItem = await api.addItem(name, defaultPrice, source, timing);
