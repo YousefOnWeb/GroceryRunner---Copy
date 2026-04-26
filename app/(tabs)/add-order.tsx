@@ -6,7 +6,7 @@ import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
 import { items, orderItems, orders, personAliases, persons } from '@/db/schema';
-import { extractDateValue, formatDateLabel, getDefaultDate } from '@/utils/dates';
+import { extractDateValue, formatDateLabel, getDefaultDate, getLocalDateString } from '@/utils/dates';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
@@ -43,7 +43,7 @@ export default function AddOrderScreen() {
 
   const [editModeOrderId, setEditModeOrderId] = useState<string | null>(null);
 
-  const targetDateDb = targetDate.toISOString().split('T')[0];
+  const targetDateDb = getLocalDateString(targetDate);
   const existingOrder = useMemo(() => {
     if (!allOrders || !selectedPersonId) return null;
     return allOrders.find(o => o.personId === selectedPersonId && o.targetDate === targetDateDb);
@@ -394,7 +394,7 @@ export default function AddOrderScreen() {
           existingOrder && editModeOrderId !== existingOrder.id && styles.saveButtonDisabled
         ]} 
         onPress={handleSaveOrder}
-        disabled={existingOrder && editModeOrderId !== existingOrder.id}>
+        disabled={!!(existingOrder && editModeOrderId !== existingOrder.id)}>
         <Text style={[styles.saveButtonText, settings.compactMode && styles.textSmall]}>{editModeOrderId ? 'Save Edited Order' : 'Save Order'}</Text>
       </TouchableOpacity>
 

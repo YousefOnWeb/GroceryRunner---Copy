@@ -6,7 +6,7 @@ import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
 import { items, orderItems, orders, persons } from '@/db/schema';
-import { extractDateValue, formatDateLabel, getDefaultDate } from '@/utils/dates';
+import { extractDateValue, formatDateLabel, generateDateOptions, getDefaultDate, getLocalDateString } from '@/utils/dates';
 import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -31,6 +31,11 @@ export default function TheRunScreen() {
   const [collapsedSources, setCollapsedSources] = useState<Record<string, boolean>>({});
   const [collapsedLocations, setCollapsedLocations] = useState<Record<string, boolean>>({});
 
+  // Multi-select mode
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [showMoveDatePicker, setShowMoveDatePicker] = useState(false);
+
   const { settings } = useSettings();
 
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
@@ -46,7 +51,7 @@ export default function TheRunScreen() {
       return { aggregatedItems: {}, peopleOrders: [] };
     }
 
-    const targetDateDb = targetDate.toISOString().split('T')[0];
+    const targetDateDb = getLocalDateString(targetDate);
     const filteredOrders = allOrders.filter(o => o.targetDate === targetDateDb);
 
     filteredOrders.forEach((order) => {
@@ -285,6 +290,59 @@ export default function TheRunScreen() {
     setCollapsedLocations(prev => ({ ...prev, [locKey]: !prev[locKey] }));
   };
 
+  const toggleOrderSelection = (orderId: string) => {
+    const next = new Set(selectedOrders);
+    if (next.has(orderId)) {
+      next.delete(orderId);
+      if (next.size === 0) setSelectionMode(false);
+    } else {
+      next.add(orderId);
+    }
+    setSelectedOrders(next);
+  };
+
+  const handleDeleteSelected = () => {
+    Alert.alert(
+      'Delete Selected',
+      `Are you sure you want to delete ${selectedOrders.size} order(s)?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              for (const orderId of Array.from(selectedOrders)) {
+                await api.deleteOrder(orderId);
+              }
+              setSelectionMode(false);
+              setSelectedOrders(new Set());
+            } catch (e) {
+              console.error(e);
+              Alert.alert('Error', 'Failed to delete selected orders');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleMoveSelected = async (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowMoveDatePicker(false);
+    if (selectedDate && event.type === 'set') {
+      try {
+        const newDateStr = getLocalDateString(selectedDate);
+        await api.moveOrdersToDate(Array.from(selectedOrders), newDateStr);
+        setSelectionMode(false);
+        setSelectedOrders(new Set());
+        Alert.alert('Success', `Moved ${selectedOrders.size} order(s) to ${formatDateLabel(selectedDate)}`);
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Error', 'Failed to move orders');
+      }
+    }
+  };
+
   const hasItems = Object.keys(aggregatedItems).length > 0 &&
     Object.values(aggregatedItems).some(sources => Object.keys(sources).length > 0);
 
@@ -302,16 +360,33 @@ export default function TheRunScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
       <View style={[styles.header, settings.compactMode && styles.headerCompact, { zIndex: 10 }]}>
-        <View style={styles.headerLeft}>
-          <Text style={[styles.headerTitle, settings.compactMode && styles.textSmall]}>Run:</Text>
-          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
-            <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate)}</Text>
-            <FontAwesome name="calendar" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+        {!selectionMode ? (
+          <View style={styles.headerLeft}>
+            <Text style={[styles.headerTitle, settings.compactMode && styles.textSmall]}>Run:</Text>
+            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
+              <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate)}</Text>
+              <FontAwesome name="calendar" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedOrders(new Set()); }} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
+              <FontAwesome name="times" size={settings.compactMode ? 18 : 20} color="#888" />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, settings.compactMode && styles.textSmall]}>{selectedOrders.size} Selected</Text>
+            <TouchableOpacity onPress={() => setShowMoveDatePicker(true)} style={[styles.copyBtn, { marginLeft: 10 }, settings.compactMode && styles.paddingSmall]}>
+              <FontAwesome name="calendar" size={settings.compactMode ? 18 : 20} color="#2f95dc" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleDeleteSelected} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
+              <FontAwesome name="trash" size={settings.compactMode ? 18 : 20} color="#ff4444" />
+            </TouchableOpacity>
+          </View>
+        )}
+        {!selectionMode && (
+          <TouchableOpacity onPress={handleCopyRun} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
+            <FontAwesome name="copy" size={settings.compactMode ? 18 : 20} color="#2f95dc" />
           </TouchableOpacity>
-        </View>
-        <TouchableOpacity onPress={handleCopyRun} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
-          <FontAwesome name="copy" size={settings.compactMode ? 18 : 20} color="#2f95dc" />
-        </TouchableOpacity>
+        )}
       </View>
 
       {showDatePicker && (
@@ -320,6 +395,15 @@ export default function TheRunScreen() {
           mode="date"
           display="default"
           onChange={onDateChange}
+        />
+      )}
+
+      {showMoveDatePicker && (
+        <DateTimePicker
+          value={targetDate}
+          mode="date"
+          display="default"
+          onChange={handleMoveSelected}
         />
       )}
 
@@ -430,19 +514,45 @@ export default function TheRunScreen() {
                          (po.deliveryPlace && po.deliveryPlace.toLowerCase().includes(q));
                 })
                 .map((po) => (
-                  <View key={po.person.id} style={[styles.personCard, settings.compactMode && styles.personCardCompact]}>
-                    <View style={[styles.personHeader, settings.compactMode && styles.personHeaderCompact]}>
-                      <View>
-                        <Text style={[styles.personName, settings.compactMode && styles.personNameCompact]}>{po.person.name}</Text>
-                        {po.deliveryPlace ? (
-                          <Text style={[styles.deliveryPlace, settings.compactMode && styles.textExtraSmall]}>📍 {po.deliveryPlace}</Text>
-                        ) : null}
+                  <View key={po.person.id} style={[styles.personCard, settings.compactMode && styles.personCardCompact, selectionMode && selectedOrders.has(po.order.id) && { borderColor: '#2f95dc', borderWidth: 1 }]}>
+                    <TouchableOpacity 
+                      activeOpacity={0.8}
+                      onLongPress={() => {
+                        if (!selectionMode) {
+                          setSelectionMode(true);
+                          setSelectedOrders(new Set([po.order.id]));
+                        }
+                      }}
+                      onPress={() => {
+                        if (selectionMode) {
+                          toggleOrderSelection(po.order.id);
+                        }
+                      }}
+                      style={[styles.personHeader, settings.compactMode && styles.personHeaderCompact, selectionMode && selectedOrders.has(po.order.id) && { backgroundColor: 'rgba(47, 149, 220, 0.15)' }]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        {selectionMode && (
+                          <FontAwesome 
+                            name={selectedOrders.has(po.order.id) ? 'check-square-o' : 'square-o'} 
+                            size={settings.compactMode ? 20 : 24} 
+                            color={selectedOrders.has(po.order.id) ? '#2f95dc' : '#888'} 
+                            style={{ marginRight: 10 }} 
+                          />
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.personName, settings.compactMode && styles.personNameCompact]}>{po.person.name}</Text>
+                          {po.deliveryPlace ? (
+                            <Text style={[styles.deliveryPlace, settings.compactMode && styles.textExtraSmall]}>📍 {po.deliveryPlace}</Text>
+                          ) : null}
+                        </View>
                       </View>
                       <View style={styles.costInfo}>
                         <View style={styles.orderActions}>
-                          <TouchableOpacity onPress={() => handleDeleteOrder(po.order.id, po.person.name)} style={styles.deleteOrderBtn}>
-                            <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#ff4444" />
-                          </TouchableOpacity>
+                          {!selectionMode && (
+                            <TouchableOpacity onPress={() => handleDeleteOrder(po.order.id, po.person.name)} style={styles.deleteOrderBtn}>
+                              <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#ff4444" />
+                            </TouchableOpacity>
+                          )}
                           <Text style={[styles.personTotal, settings.compactMode && styles.personTotalCompact]}>
                             ${po.totalCost.toFixed(2)}{po.hasUnknownPriceItems ? ' + TBD' : ''}
                           </Text>
@@ -451,7 +561,7 @@ export default function TheRunScreen() {
                           <Text style={[styles.unpaidCost, settings.compactMode && styles.textExtraSmall]}>(${po.unpaidCost.toFixed(2)} unpaid)</Text>
                         )}
                       </View>
-                    </View>
+                    </TouchableOpacity>
 
                     <View style={styles.personItems}>
                       {po.items.map((i) => {

@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import * as crypto from 'expo-crypto';
 import { db } from './index';
 import { items, orderItems, orders, personAliases, persons, transactions } from './schema';
@@ -198,15 +198,6 @@ export const api = {
       await db.update(persons)
         .set({ balance: sql`${persons.balance} + ${oldUnpaidCost}` })
         .where(eq(persons.id, personId));
-      
-      await db.insert(transactions).values({
-        id: generateId(),
-        personId,
-        amount: oldUnpaidCost,
-        date: new Date().toISOString(),
-        type: 'ManualAdjustment',
-        note: `Reverted old items for edited order (${targetDate})`,
-      });
     }
 
     // 2. Delete old items
@@ -236,14 +227,23 @@ export const api = {
       await db.update(persons)
         .set({ balance: sql`${persons.balance} - ${newTotalCost}` })
         .where(eq(persons.id, personId));
+    }
 
+    // Replace old order logs with a single clean one
+    await db.delete(transactions).where(and(
+      eq(transactions.personId, personId),
+      eq(transactions.type, 'OrderCost'),
+      like(transactions.note, `%${targetDate}%`)
+    ));
+
+    if (newTotalCost > 0) {
       await db.insert(transactions).values({
         id: generateId(),
         personId,
         amount: -newTotalCost,
         date: new Date().toISOString(),
         type: 'OrderCost',
-        note: `Updated items for order (${targetDate})`,
+        note: `Order for ${targetDate}`,
       });
     }
     
@@ -573,6 +573,61 @@ export const api = {
   },
 
   deleteOrder: async (orderId: string) => {
+    // 1. Get order info to know personId and targetDate
+    const orderInfo = await db.select().from(orders).where(eq(orders.id, orderId));
+    if (orderInfo.length === 0) return;
+    const { personId, targetDate } = orderInfo[0];
+
+    // 2. Get unpaid items to revert debt
+    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+    let unpaidCost = 0;
+    items.forEach(oi => {
+      if (!oi.isPaid) {
+        unpaidCost += (oi.quantity * (oi.unitPrice || 0));
+      }
+    });
+
+    // 3. Revert balance (increase back what was charged)
+    if (unpaidCost > 0) {
+      await db.update(persons)
+        .set({ balance: sql`${persons.balance} + ${unpaidCost}` })
+        .where(eq(persons.id, personId));
+    }
+
+    // 4. Delete related OrderCost transactions
+    await db.delete(transactions).where(and(
+      eq(transactions.personId, personId),
+      eq(transactions.type, 'OrderCost'),
+      like(transactions.note, `%${targetDate}%`)
+    ));
+
+    // 5. Delete order items and the order itself
+    await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
     await db.delete(orders).where(eq(orders.id, orderId));
+  },
+
+  moveOrdersToDate: async (orderIds: string[], newDate: string) => {
+    for (const orderId of orderIds) {
+      const orderInfo = await db.select().from(orders).where(eq(orders.id, orderId));
+      if (orderInfo.length === 0) continue;
+      const { personId, targetDate } = orderInfo[0];
+
+      // Update the date in the order record
+      await db.update(orders).set({ targetDate: newDate }).where(eq(orders.id, orderId));
+
+      // Find the related transaction(s) and update its note to reflect the new date
+      const relatedLogs = await db.select().from(transactions).where(and(
+        eq(transactions.personId, personId),
+        eq(transactions.type, 'OrderCost'),
+        like(transactions.note, `%${targetDate}%`)
+      ));
+
+      for (const log of relatedLogs) {
+        if (log.note) {
+          const newNote = log.note.replace(targetDate, newDate);
+          await db.update(transactions).set({ note: newNote }).where(eq(transactions.id, log.id));
+        }
+      }
+    }
   },
 };

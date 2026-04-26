@@ -1,3 +1,10 @@
+export function getLocalDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function generateDateOptions(days: number = 14) {
   const options: string[] = [];
   const today = new Date();
@@ -6,7 +13,7 @@ export function generateDateOptions(days: number = 14) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     
-    const value = d.toISOString().split('T')[0];
+    const value = getLocalDateString(d);
     const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
     let label = `${value} (${weekday})`;
     
@@ -36,15 +43,15 @@ export function getDefaultDate() {
 }
 
 export function formatDateLabel(date: Date) {
-  const value = date.toISOString().split('T')[0];
+  const value = getLocalDateString(date);
   const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
   
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = getLocalDateString(today);
   
   const tomorrow = new Date();
   tomorrow.setDate(today.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  const tomorrowStr = getLocalDateString(tomorrow);
   
   let label = `${value} (${weekday})`;
   if (value === todayStr) label = `Today - ${label}`;
