@@ -62,12 +62,12 @@ export default function TheRunScreen() {
   const { data: catalog } = useLiveQuery(db.select().from(items));
   const { data: people } = useLiveQuery(db.select().from(persons));
 
-  const { aggregatedItems, peopleOrders } = useMemo(() => {
+  const { aggregatedItems, peopleOrders, listTotal } = useMemo(() => {
     const agg: Record<string, { item: any; totalQuantity: number; totalCost: number }> = {};
     const pOrders: Record<string, { person: any; order: any; items: any[]; totalCost: number; unpaidCost: number; hasUnpaidItems: boolean; hasUnknownPriceItems: boolean; deliveryPlace: string | null }> = {};
 
     if (!allOrders || !allOrderItems || !catalog || !people) {
-      return { aggregatedItems: {}, peopleOrders: [] };
+      return { aggregatedItems: {}, peopleOrders: [], listTotal: 0 };
     }
 
     const targetDateDb = getLocalDateString(targetDate);
@@ -185,14 +185,17 @@ export default function TheRunScreen() {
       return a.localeCompare(b);
     });
 
+    const listTotal = Object.values(agg).reduce((sum, item) => sum + item.totalCost, 0);
+
     return {
       aggregatedItems: groupedList,
       peopleOrders: sortedLocations.map(loc => ({
         location: loc,
         orders: groupedDeliveries[loc] || []
       })),
+      listTotal,
     };
-  }, [allOrders, allOrderItems, catalog, people, targetDate, settings.groupByFreshness, settings.locationOrder, settings.sourceOrder, targetDate]);
+  }, [allOrders, allOrderItems, catalog, people, targetDate, settings.groupByFreshness, settings.locationOrder, settings.sourceOrder, targetDate, refreshKey]);
 
   const toggleCheck = (itemId: string) => {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
@@ -447,7 +450,12 @@ export default function TheRunScreen() {
       )}
 
       <ScrollView style={[styles.content, settings.compactMode && styles.contentCompact]}>
-        <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>🛍️ The Shopping List</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>🛍️ The Shopping List</Text>
+          {listTotal > 0 && (
+            <Text style={[styles.sectionTotal, settings.compactMode && styles.textSmall]}>Total: ${listTotal.toFixed(2)}</Text>
+          )}
+        </View>
         {Object.entries(aggregatedItems).map(([timingKey, sources]) => (
           <View key={timingKey} style={styles.timingGroup}>
             {settings.groupByFreshness && timingKey !== '_all' && (
@@ -762,6 +770,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   sectionTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 10 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  sectionTotal: { fontSize: 18, fontWeight: 'bold', color: '#ffeb3b' },
   searchInput: {
     backgroundColor: '#333',
     color: '#fff',
