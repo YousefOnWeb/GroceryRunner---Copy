@@ -10,8 +10,9 @@ import { extractDateValue, formatDateLabel, generateDateOptions, getDefaultDate,
 import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import React, { useMemo, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View as RNView, KeyboardAvoidingView } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View as RNView, KeyboardAvoidingView, AppState } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 
 export default function TheRunScreen() {
@@ -35,8 +36,26 @@ export default function TheRunScreen() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [showMoveDatePicker, setShowMoveDatePicker] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const { settings } = useSettings();
+
+  // Force re-render when screen is focused to refresh "Today" labels
+  useFocusEffect(
+    React.useCallback(() => {
+      setRefreshKey(prev => prev + 1);
+    }, [])
+  );
+
+  // Refresh when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        setRefreshKey(prev => prev + 1);
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
@@ -343,6 +362,18 @@ export default function TheRunScreen() {
     }
   };
 
+  const handlePrevDay = () => {
+    const d = new Date(targetDate);
+    d.setDate(d.getDate() - 1);
+    setTargetDate(d);
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(targetDate);
+    d.setDate(d.getDate() + 1);
+    setTargetDate(d);
+  };
+
   const hasItems = Object.keys(aggregatedItems).length > 0 &&
     Object.values(aggregatedItems).some(sources => Object.keys(sources).length > 0);
 
@@ -363,10 +394,18 @@ export default function TheRunScreen() {
         {!selectionMode ? (
           <View style={styles.headerLeft}>
             <Text style={[styles.headerTitle, settings.compactMode && styles.textSmall]}>Run:</Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
-              <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate)}</Text>
-              <FontAwesome name="calendar" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
-            </TouchableOpacity>
+            <View style={styles.dateNavRow}>
+              <TouchableOpacity onPress={handlePrevDay} style={[styles.navBtn, settings.compactMode && styles.paddingSmall]}>
+                <FontAwesome name="chevron-left" size={settings.compactMode ? 14 : 16} color="#888" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
+                <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate)}</Text>
+                <FontAwesome name="calendar" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleNextDay} style={[styles.navBtn, settings.compactMode && styles.paddingSmall]}>
+                <FontAwesome name="chevron-right" size={settings.compactMode ? 14 : 16} color="#888" />
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
           <View style={styles.headerLeft}>
@@ -716,6 +755,8 @@ const styles = StyleSheet.create({
   dateDisplayText: { color: '#fff', fontSize: 14, fontWeight: '500' },
   headerTitle: { fontSize: 16, color: '#fff' },
   copyBtn: { padding: 10, marginLeft: 5 },
+  dateNavRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
+  navBtn: { padding: 8 },
   content: { padding: 15 },
   deliveriesHeader: {
     marginBottom: 15,
