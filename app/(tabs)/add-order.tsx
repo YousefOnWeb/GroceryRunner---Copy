@@ -10,7 +10,7 @@ import { extractDateValue, formatDateLabel, getDefaultDate, getLocalDateString }
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSettings } from '@/utils/settings';
 import SmartTextInput from '@/components/SmartTextInput';
 import { COMMON_GROCERY_CORPUS, COMMON_NAMES_CORPUS } from '@/utils/textMatching';
@@ -184,7 +184,17 @@ export default function AddOrderScreen() {
     }
   };
 
-  const filteredCatalog = catalog?.filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase())) || [];
+  const filteredCatalog = catalog?.filter((item) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const searchString = [
+      item.name,
+      item.defaultPrice?.toString(),
+      item.source,
+      item.timing
+    ].join(' ').toLowerCase();
+    return searchString.includes(q);
+  }) || [];
   const exactItemMatch = filteredCatalog.find(i => i.name.toLowerCase() === searchQuery.toLowerCase().trim());
 
   // Person search: match by primary name OR alias
@@ -199,9 +209,15 @@ export default function AddOrderScreen() {
         .map(a => a.personId) || []
     );
 
-    return people.filter(p =>
-      p.name.toLowerCase().includes(q) || aliasMatchedIds.has(p.id)
-    );
+    return people.filter(p => {
+      const searchString = [
+        p.name,
+        p.typicalPlace,
+        ...Array.from(allAliases?.filter(a => a.personId === p.id).map(a => a.alias) || [])
+      ].join(' ').toLowerCase();
+      
+      return searchString.includes(q) || aliasMatchedIds.has(p.id);
+    });
   }, [people, allAliases, personSearchQuery]);
 
   const exactPersonMatch = useMemo(() => {
@@ -228,7 +244,11 @@ export default function AddOrderScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+    >
       <ScrollView keyboardShouldPersistTaps="handled">
         
         {/* 1. Who is this for? */}
@@ -412,7 +432,7 @@ export default function AddOrderScreen() {
         onCancel={() => setPersonModalVisible(false)}
         onDone={handleCreatePersonDone}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

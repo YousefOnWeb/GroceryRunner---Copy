@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSettings } from '@/utils/settings';
 import { Text, View } from '@/components/Themed';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -100,7 +100,11 @@ export default function StatsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+    >
       <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
         
         {/* STATISTICS SECTION */}
@@ -131,7 +135,7 @@ export default function StatsScreen() {
             style={[styles.dictionarySearch, settings.compactMode && styles.dictionarySearchCompact]}
             value={itemSearch}
             onChangeText={setItemSearch}
-            placeholder="Search items..."
+            placeholder="Search name, price, source, or timing..."
             placeholderTextColor="#888"
             corpus={itemCorpus}
             compactMode={settings.compactMode}
@@ -139,7 +143,17 @@ export default function StatsScreen() {
         </View>
         <Text style={[styles.helperText, settings.compactMode && styles.textExtraSmall]}>Update default prices, sources, and timing for your items here.</Text>
 
-        {catalog?.filter(item => item.name.toLowerCase().includes(itemSearch.toLowerCase().trim())).map((item) => (
+        {catalog?.filter(item => {
+          const q = itemSearch.toLowerCase().trim();
+          if (!q) return true;
+          const searchString = [
+            item.name,
+            item.defaultPrice?.toString(),
+            item.source,
+            item.timing
+          ].join(' ').toLowerCase();
+          return searchString.includes(q);
+        }).map((item) => (
           <View key={item.id} style={[styles.itemCard, settings.compactMode && styles.itemCardCompact]}>
             <View style={[styles.itemHeader, settings.compactMode && styles.itemHeaderCompact]}>
               <Text style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{item.name}</Text>
@@ -176,7 +190,7 @@ export default function StatsScreen() {
           onSubmit={handleSaveItem}
         />
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -197,19 +211,17 @@ const styles = StyleSheet.create({
   actionButtons: { flexDirection: 'row', gap: 15 },
   iconBtn: { padding: 5 },
   dictionaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 10,
+    gap: 10,
   },
   dictionarySearch: {
     backgroundColor: '#333',
     color: '#fff',
-    paddingVertical: 6,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 8,
-    fontSize: 14,
-    width: '40%',
+    fontSize: 16,
+    width: '100%',
   },
   itemDetails: { gap: 5 },
   detailText: { color: '#ccc' },

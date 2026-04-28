@@ -11,7 +11,7 @@ import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View as RNView, KeyboardAvoidingView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
 export default function TheRunScreen() {
@@ -170,10 +170,10 @@ export default function TheRunScreen() {
       aggregatedItems: groupedList,
       peopleOrders: sortedLocations.map(loc => ({
         location: loc,
-        orders: groupedDeliveries[loc]
+        orders: groupedDeliveries[loc] || []
       })),
     };
-  }, [allOrders, allOrderItems, catalog, people, targetDate, settings.groupByFreshness, settings.locationOrder, settings.sourceOrder]);
+  }, [allOrders, allOrderItems, catalog, people, targetDate, settings.groupByFreshness, settings.locationOrder, settings.sourceOrder, targetDate]);
 
   const toggleCheck = (itemId: string) => {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
@@ -489,7 +489,22 @@ export default function TheRunScreen() {
           />
         </View>
 
+
         {peopleOrders.map((group) => {
+          const q = searchQuery.toLowerCase().trim();
+          const filteredOrders = !q ? group.orders : group.orders.filter(po => {
+            const itemNames = po.items.map(i => i.itemDef?.name || '').join(' ');
+            const searchString = [
+              po.person.name,
+              po.deliveryPlace,
+              itemNames,
+              po.totalCost.toFixed(2)
+            ].join(' ').toLowerCase();
+            return searchString.includes(q);
+          });
+
+          if (filteredOrders.length === 0) return null;
+
           const isCollapsed = collapsedLocations[group.location];
           return (
             <View key={group.location} style={[styles.locationGroup, settings.compactMode && styles.locationGroupCompact]}>
@@ -506,140 +521,155 @@ export default function TheRunScreen() {
                 <Text style={[styles.deliveryLocationTitle, settings.compactMode && styles.deliveryLocationTitleCompact]}>📍 {group.location}</Text>
               </TouchableOpacity>
 
-              {!isCollapsed && group.orders
-                .filter(po => {
-                  const q = searchQuery.toLowerCase().trim();
-                  if (!q) return true;
-                  return po.person.name.toLowerCase().includes(q) || 
-                         (po.deliveryPlace && po.deliveryPlace.toLowerCase().includes(q));
-                })
-                .map((po) => (
-                  <View key={po.person.id} style={[styles.personCard, settings.compactMode && styles.personCardCompact, selectionMode && selectedOrders.has(po.order.id) && { borderColor: '#2f95dc', borderWidth: 1 }]}>
-                    <TouchableOpacity 
-                      activeOpacity={0.8}
-                      onLongPress={() => {
-                        if (!selectionMode) {
-                          setSelectionMode(true);
-                          setSelectedOrders(new Set([po.order.id]));
-                        }
-                      }}
-                      onPress={() => {
-                        if (selectionMode) {
-                          toggleOrderSelection(po.order.id);
-                        }
-                      }}
-                      style={[styles.personHeader, settings.compactMode && styles.personHeaderCompact, selectionMode && selectedOrders.has(po.order.id) && { backgroundColor: 'rgba(47, 149, 220, 0.15)' }]}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        {selectionMode && (
-                          <FontAwesome 
-                            name={selectedOrders.has(po.order.id) ? 'check-square-o' : 'square-o'} 
-                            size={settings.compactMode ? 20 : 24} 
-                            color={selectedOrders.has(po.order.id) ? '#2f95dc' : '#888'} 
-                            style={{ marginRight: 10 }} 
-                          />
-                        )}
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.personName, settings.compactMode && styles.personNameCompact]}>{po.person.name}</Text>
-                          {po.deliveryPlace ? (
-                            <Text style={[styles.deliveryPlace, settings.compactMode && styles.textExtraSmall]}>📍 {po.deliveryPlace}</Text>
-                          ) : null}
-                        </View>
+              {!isCollapsed && filteredOrders.map((po) => (
+                <View key={po.person.id} style={[styles.personCard, settings.compactMode && styles.personCardCompact, selectionMode && selectedOrders.has(po.order.id) && { borderColor: '#2f95dc', borderWidth: 1 }]}>
+                  <TouchableOpacity 
+                    activeOpacity={0.8}
+                    onLongPress={() => {
+                      if (!selectionMode) {
+                        setSelectionMode(true);
+                        setSelectedOrders(new Set([po.order.id]));
+                      }
+                    }}
+                    onPress={() => {
+                      if (selectionMode) {
+                        toggleOrderSelection(po.order.id);
+                      }
+                    }}
+                    style={[styles.personHeader, settings.compactMode && styles.personHeaderCompact, selectionMode && selectedOrders.has(po.order.id) && { backgroundColor: 'rgba(47, 149, 220, 0.15)' }]}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                      {selectionMode && (
+                        <FontAwesome 
+                          name={selectedOrders.has(po.order.id) ? 'check-square-o' : 'square-o'} 
+                          size={settings.compactMode ? 20 : 24} 
+                          color={selectedOrders.has(po.order.id) ? '#2f95dc' : '#888'} 
+                          style={{ marginRight: 10 }} 
+                        />
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.personName, settings.compactMode && styles.personNameCompact]}>{po.person.name}</Text>
+                        {po.deliveryPlace ? (
+                          <Text style={[styles.deliveryPlace, settings.compactMode && styles.textExtraSmall]}>📍 {po.deliveryPlace}</Text>
+                        ) : null}
                       </View>
-                      <View style={styles.costInfo}>
-                        <View style={styles.orderActions}>
-                          {!selectionMode && (
-                            <TouchableOpacity onPress={() => handleDeleteOrder(po.order.id, po.person.name)} style={styles.deleteOrderBtn}>
-                              <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#ff4444" />
-                            </TouchableOpacity>
-                          )}
-                          <Text style={[styles.personTotal, settings.compactMode && styles.personTotalCompact]}>
-                            ${po.totalCost.toFixed(2)}{po.hasUnknownPriceItems ? ' + TBD' : ''}
-                          </Text>
-                        </View>
-                        {po.unpaidCost > 0 && (
-                          <Text style={[styles.unpaidCost, settings.compactMode && styles.textExtraSmall]}>(${po.unpaidCost.toFixed(2)} unpaid)</Text>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-
-                    <View style={styles.personItems}>
-                      {po.items.map((i) => {
-                        const itemCost = (i.unitPrice ?? 0) * i.quantity;
-                        return (
-                          <View key={i.id} style={[styles.itemRow2, settings.compactMode && styles.itemRow2Compact]}>
-                            <TouchableOpacity
-                              onPress={() => handleToggleItemPaid(i.id, po.person.id, itemCost, i.isPaid)}
-                              style={[styles.itemToggle, settings.compactMode && styles.paddingSmall]}>
-                              <FontAwesome
-                                name={i.isPaid ? 'check-square-o' : 'square-o'}
-                                size={settings.compactMode ? 16 : 18}
-                                color={i.isPaid ? '#28a745' : '#ccc'}
-                              />
-                            </TouchableOpacity>
-                            <View style={styles.itemInfo}>
-                              <Text style={[styles.personItemText, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid]}>
-                                {i.quantity}x {i.itemDef?.name} - {i.unitPrice === null ? 'Price TBD' : `$${itemCost.toFixed(2)}`}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })}
                     </View>
-
-                    <View style={[styles.personFooter, settings.compactMode && styles.personFooterCompact]}>
-                      <View>
-                        <View style={styles.balanceHeaderRow}>
-                          <Text style={[styles.balanceLabel, settings.compactMode && styles.textExtraSmall, po.person.balance < 0 ? styles.debtLabel : po.person.balance > 0 ? styles.creditLabel : po.hasUnknownPriceItems ? styles.pendingLabel : styles.settledLabel]}>
-                            {po.person.balance < 0
-                              ? 'Your money with them: '
-                              : po.person.balance > 0
-                              ? 'Their money with you: '
-                              : po.hasUnknownPriceItems
-                              ? 'Awaiting Prices: '
-                              : 'Settled: '}
-                          </Text>
-                          {po.hasUnknownPriceItems && (
-                            <TouchableOpacity
-                              onPress={() => setUnknownPricePerson({ id: po.person.id, name: po.person.name })}
-                              style={[styles.notesBtn, settings.compactMode && styles.paddingSmall]}>
-                              <FontAwesome name="exclamation-circle" size={settings.compactMode ? 14 : 18} color="#ff9800" />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                        <View style={styles.balanceValueRow}>
-                          <Text style={[po.person.balance < 0 ? styles.debt : po.person.balance > 0 ? styles.credit : po.hasUnknownPriceItems ? styles.pending : styles.settled, settings.compactMode && styles.personTotalCompact]}>
-                            ${Math.abs(po.person.balance).toFixed(2)}
-                          </Text>
-                          <TouchableOpacity 
-                            onPress={() => setLogPerson({ id: po.person.id, name: po.person.name })}
-                            style={[styles.historyBtn, settings.compactMode && styles.paddingSmall]}
-                          >
-                            <FontAwesome name="history" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+                    <View style={styles.costInfo}>
+                      <View style={styles.orderActions}>
+                        {!selectionMode && (
+                          <TouchableOpacity onPress={() => handleDeleteOrder(po.order.id, po.person.name)} style={styles.deleteOrderBtn}>
+                            <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#ff4444" />
                           </TouchableOpacity>
-                        </View>
+                        )}
+                        <Text style={[styles.personTotal, settings.compactMode && styles.personTotalCompact]}>
+                          ${po.totalCost.toFixed(2)}{po.hasUnknownPriceItems ? ' + TBD' : ''}
+                        </Text>
                       </View>
-                      <View style={styles.buttonGroup}>
-                        {po.hasUnpaidItems ? (
+                      {po.unpaidCost > 0 && (
+                        <Text style={[styles.unpaidCost, settings.compactMode && styles.textExtraSmall]}>(${po.unpaidCost.toFixed(2)} unpaid)</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={styles.personItems}>
+                    {po.items.map((i) => {
+                      const itemCost = (i.unitPrice ?? 0) * i.quantity;
+                      return (
+                        <View key={i.id} style={[styles.itemRow2, settings.compactMode && styles.itemRow2Compact]}>
                           <TouchableOpacity
-                            style={[styles.markAllPaidBtn, settings.compactMode && styles.compactBtn]}
-                            onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
-                            <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>Mark All Paid</Text>
+                            onPress={() => handleToggleItemPaid(i.id, po.person.id, itemCost, i.isPaid)}
+                            style={[styles.itemToggle, settings.compactMode && styles.paddingSmall]}>
+                            <FontAwesome
+                              name={i.isPaid ? 'check-square-o' : 'square-o'}
+                              size={settings.compactMode ? 16 : 18}
+                              color={i.isPaid ? '#28a745' : '#ccc'}
+                            />
                           </TouchableOpacity>
-                        ) : (
+                          <View style={styles.itemInfo}>
+                            <Text style={[styles.personItemText, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid]}>
+                              {i.quantity}x {i.itemDef?.name} - {i.unitPrice === null ? 'Price TBD' : `$${itemCost.toFixed(2)}`}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  <View style={[styles.personFooter, settings.compactMode && styles.personFooterCompact]}>
+                    <View>
+                      <View style={styles.balanceHeaderRow}>
+                        <Text style={[styles.balanceLabel, settings.compactMode && styles.textExtraSmall, po.person.balance < 0 ? styles.debtLabel : po.person.balance > 0 ? styles.creditLabel : po.hasUnknownPriceItems ? styles.pendingLabel : styles.settledLabel]}>
+                          {po.person.balance < 0
+                            ? 'Your money with them: '
+                            : po.person.balance > 0
+                            ? 'Their money with you: '
+                            : po.hasUnknownPriceItems
+                            ? 'Awaiting Prices: '
+                            : 'Settled: '}
+                        </Text>
+                        {po.hasUnknownPriceItems && (
                           <TouchableOpacity
-                            style={[styles.markAllUnpaidBtn, settings.compactMode && styles.compactBtn]}
-                            onPress={() => handleMarkAllUnpaid(po.order.id, po.person.id)}>
-                            <Text style={[styles.markAllUnpaidText, settings.compactMode && styles.textExtraSmall]}>Mark All Unpaid</Text>
+                            onPress={() => setUnknownPricePerson({ id: po.person.id, name: po.person.name })}
+                            style={[styles.notesBtn, settings.compactMode && styles.paddingSmall]}>
+                            <FontAwesome name="exclamation-circle" size={settings.compactMode ? 14 : 18} color="#ff9800" />
                           </TouchableOpacity>
                         )}
                       </View>
+                      <View style={styles.balanceValueRow}>
+                        <Text style={[po.person.balance < 0 ? styles.debt : po.person.balance > 0 ? styles.credit : po.hasUnknownPriceItems ? styles.pending : styles.settled, settings.compactMode && styles.personTotalCompact]}>
+                          ${Math.abs(po.person.balance).toFixed(2)}
+                        </Text>
+                        <TouchableOpacity 
+                          onPress={() => setLogPerson({ id: po.person.id, name: po.person.name })}
+                          style={[styles.historyBtn, settings.compactMode && styles.paddingSmall]}
+                        >
+                          <FontAwesome name="history" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <View style={styles.buttonGroup}>
+                      {po.hasUnpaidItems ? (
+                        <TouchableOpacity
+                          style={[styles.markAllPaidBtn, settings.compactMode && styles.compactBtn]}
+                          onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
+                          <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>Mark All Paid</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.markAllUnpaidBtn, settings.compactMode && styles.compactBtn]}
+                          onPress={() => handleMarkAllUnpaid(po.order.id, po.person.id)}>
+                          <Text style={[styles.markAllUnpaidText, settings.compactMode && styles.textExtraSmall]}>Mark All Unpaid</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
-                ))}
+                </View>
+              ))}
             </View>
           );
         })}
+
+        {(() => {
+          const q = searchQuery.toLowerCase().trim();
+          if (!q) return null;
+          const totalFound = peopleOrders.reduce((sum, g) => {
+            return sum + g.orders.filter(po => {
+              const itemNames = po.items.map(i => i.itemDef?.name || '').join(' ');
+              const searchString = [po.person.name, po.deliveryPlace, itemNames, po.totalCost.toFixed(2)].join(' ').toLowerCase();
+              return searchString.includes(q);
+            }).length;
+          }, 0);
+
+          if (totalFound === 0) {
+            return (
+              <View style={styles.noResultsContainer}>
+                <FontAwesome name="search" size={48} color="#444" style={{ marginBottom: 10 }} />
+                <Text style={styles.noResultsText}>No orders found matching "{searchQuery}"</Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
       </ScrollView>
 
       {unknownPricePerson && (
@@ -782,4 +812,20 @@ const styles = StyleSheet.create({
   textSmall: { fontSize: 13 },
   textExtraSmall: { fontSize: 11 },
   paddingSmall: { padding: 4 },
+  noResultsContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderStyle: 'dashed',
+  },
+  noResultsText: {
+    color: '#888',
+    fontSize: 16,
+    textAlign: 'center',
+  },
 });

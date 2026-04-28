@@ -9,7 +9,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { and, eq, sql } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSettings } from '@/utils/settings';
 
@@ -38,6 +38,24 @@ export default function PeopleScreen() {
 
   // Credit log modal
   const [logPerson, setLogPerson] = useState<{ id: string; name: string } | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredPeople = useMemo(() => {
+    if (!peopleList) return [];
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return peopleList;
+
+    return peopleList.filter(p => {
+      const aliases = allAliases?.filter(a => a.personId === p.id).map(a => a.alias) || [];
+      const searchString = [
+        p.name,
+        p.typicalPlace,
+        ...aliases
+      ].join(' ').toLowerCase();
+      return searchString.includes(q);
+    });
+  }, [peopleList, allAliases, searchQuery]);
 
   const { data: unpaidUnknownPriceItems } = useLiveQuery(
     db.select({ personId: orders.personId })
@@ -144,7 +162,11 @@ export default function PeopleScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+    >
       <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
         <View style={[styles.headerRow, settings.compactMode && styles.headerRowCompact]}>
           <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>Balances</Text>
@@ -159,7 +181,17 @@ export default function PeopleScreen() {
           </View>
         </View>
 
-        {peopleList?.map((person) => {
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={[styles.searchInput, settings.compactMode && styles.searchInputCompact]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search name, place or alias..."
+            placeholderTextColor="#888"
+          />
+        </View>
+
+        {filteredPeople.map((person) => {
           const aliases = getAliasesForPerson(person.id);
           return (
             <View key={person.id} style={[styles.card, settings.compactMode && styles.cardCompact]}>
@@ -202,6 +234,13 @@ export default function PeopleScreen() {
 
         {peopleList?.length === 0 && (
           <Text style={styles.emptyText}>No people added yet. Tap "Add Person" or add them when creating an order.</Text>
+        )}
+
+        {searchQuery.trim() !== '' && filteredPeople.length === 0 && (
+          <View style={styles.noResultsContainer}>
+            <FontAwesome name="search" size={48} color="#444" style={{ marginBottom: 10 }} />
+            <Text style={styles.noResultsText}>No one found matching "{searchQuery}"</Text>
+          </View>
         )}
       </ScrollView>
 
@@ -246,7 +285,7 @@ export default function PeopleScreen() {
           onClose={() => setLogPerson(null)}
         />
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -325,4 +364,36 @@ const styles = StyleSheet.create({
   textSmall: { fontSize: 13 },
   textExtraSmall: { fontSize: 11 },
   paddingSmall: { padding: 2 },
+  noResultsContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#222',
+    borderRadius: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#444',
+    borderStyle: 'dashed',
+  },
+  noResultsText: {
+    color: '#888',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  searchContainer: {
+    marginBottom: 15,
+  },
+  searchInput: {
+    backgroundColor: '#333',
+    color: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    fontSize: 16,
+    width: '100%',
+  },
+  searchInputCompact: {
+    paddingVertical: 6,
+    fontSize: 14,
+  },
 });
