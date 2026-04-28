@@ -630,4 +630,119 @@ export const api = {
       }
     }
   },
+
+  seedDummyData: async (options: { peopleCount: number, itemsCount: number, seedOrders: boolean }) => {
+    const { peopleCount, itemsCount, seedOrders } = options;
+
+    const realItemNames = [
+      'Milk', 'Bread', 'Eggs', 'Tomato', 'Cucumber', 'Apple', 'Banana', 'Chicken', 'Beef', 'Rice', 
+      'Pasta', 'Salt', 'Sugar', 'Tea', 'Coffee', 'Water', 'Juice', 'Yogurt', 'Cheese', 'Butter',
+      'Flour', 'Oil', 'Onion', 'Garlic', 'Potato', 'Carrot', 'Pepper', 'Lemon', 'Orange', 'Strawberry'
+    ];
+    const realPeopleNames = [
+      'Ahmed', 'Mohamed', 'Sayed', 'Youssef', 'Ibrahim', 'Ali', 'Hassan', 'Hussein', 'Omar', 'Zainab', 
+      'Fatima', 'Mariam', 'Aya', 'Nour', 'Sara', 'Mona', 'Layla', 'Hend', 'Amira', 'Khaled'
+    ];
+
+    const sources = ['Supermarket', 'Bakery', 'Farm', 'Market', 'Butcher'];
+    const timings: ('Fresh' | 'Anytime')[] = ['Fresh', 'Anytime'];
+
+    // 1. Create dummy items
+    const dummyItems = [];
+    for (let i = 0; i < itemsCount; i++) {
+      const name = realItemNames[i % realItemNames.length] + (i >= realItemNames.length ? ` ${Math.floor(i / realItemNames.length)}` : '');
+      const hasPrice = Math.random() > 0.2; // 80% have prices
+      dummyItems.push({
+        id: generateId(),
+        name,
+        source: sources[Math.floor(Math.random() * sources.length)],
+        defaultPrice: hasPrice ? parseFloat((Math.random() * 10 + 1).toFixed(2)) : null,
+        timing: timings[Math.floor(Math.random() * timings.length)],
+      });
+    }
+    if (dummyItems.length > 0) {
+      await db.insert(items).values(dummyItems);
+    }
+
+    // 2. Create dummy people
+    const places = ['Rehab', 'Madinaty', 'Tagamoa', 'Shorouk'];
+    const dummyPeople = [];
+    for (let i = 0; i < peopleCount; i++) {
+      const name = realPeopleNames[i % realPeopleNames.length] + (i >= realPeopleNames.length ? ` ${Math.floor(i / realPeopleNames.length)}` : '');
+      dummyPeople.push({
+        id: generateId(),
+        name,
+        balance: 0,
+        typicalPlace: places[Math.floor(Math.random() * places.length)],
+      });
+    }
+    if (dummyPeople.length > 0) {
+      await db.insert(persons).values(dummyPeople);
+    }
+
+    // 3. Create dummy orders if requested
+    if (seedOrders && dummyPeople.length > 0 && dummyItems.length > 0) {
+      const targetDate = new Date().toISOString().split('T')[0];
+      for (const person of dummyPeople) {
+        const orderId = generateId();
+        await db.insert(orders).values({
+          id: orderId,
+          personId: person.id,
+          targetDate,
+          isPaid: false,
+          deliveryPlace: person.typicalPlace,
+        });
+
+        // Add 1-3 random items to the order
+        const orderSize = Math.floor(Math.random() * 3) + 1;
+        let totalCost = 0;
+        for (let i = 0; i < orderSize; i++) {
+          const item = dummyItems[Math.floor(Math.random() * dummyItems.length)];
+          const quantity = Math.floor(Math.random() * 3) + 1;
+          
+          // Use item's default price if it has one
+          const unitPrice = item.defaultPrice;
+          const cost = quantity * (unitPrice || 0);
+          totalCost += cost;
+          
+          await db.insert(orderItems).values({
+            id: generateId(),
+            orderId,
+            itemId: item.id,
+            quantity,
+            unitPrice,
+            isPaid: false,
+          });
+        }
+
+        // Update person balance and log transaction
+        if (totalCost > 0) {
+          await db.update(persons)
+            .set({ balance: sql`${persons.balance} - ${totalCost}` })
+            .where(eq(persons.id, person.id));
+
+          await db.insert(transactions).values({
+            id: generateId(),
+            personId: person.id,
+            amount: -totalCost,
+            date: new Date().toISOString(),
+            type: 'OrderCost',
+            note: `Order for ${targetDate}`,
+          });
+        }
+      }
+    }
+  },
+
+  wipeAllData: async () => {
+    await db.transaction(async (tx) => {
+      // Using where(sql`1=1`) to ensure reactive hooks trigger correctly on all platforms
+      await tx.delete(transactions).where(sql`1=1`);
+      await tx.delete(orderItems).where(sql`1=1`);
+      await tx.delete(orders).where(sql`1=1`);
+      await tx.delete(personAliases).where(sql`1=1`);
+      await tx.delete(persons).where(sql`1=1`);
+      await tx.delete(items).where(sql`1=1`);
+    });
+  },
 };

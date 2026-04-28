@@ -5,35 +5,37 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import React, { useEffect, useState } from 'react';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Alert } from 'react-native';
+
+const SHOW_DEV_SECTION = true; // Toggle this manually to show/hide the dev section
 
 export default function SettingsScreen() {
   const { settings, updateSetting } = useSettings();
   const [locations, setLocations] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
   
-  const [activeModal, setActiveModal] = useState<'locations' | 'sources' | null>(null);
+  const [activeModal, setActiveModal] = useState<'locations' | 'sources' | 'seed' | null>(null);
+  const [seedOptions, setSeedOptions] = useState({ peopleCount: 5, itemsCount: 10, seedOrders: true });
+
+  const refreshPreviews = async () => {
+    const distinctPlaces = await api.getDistinctPlaces();
+    const mergedPlaces = [...settings.locationOrder];
+    distinctPlaces.forEach(loc => {
+      if (!mergedPlaces.includes(loc)) mergedPlaces.push(loc);
+    });
+    setLocations(mergedPlaces);
+
+    const distinctSources = await api.getDistinctSources();
+    const mergedSources = [...settings.sourceOrder];
+    distinctSources.forEach(src => {
+      if (!mergedSources.includes(src)) mergedSources.push(src);
+    });
+    setSources(mergedSources);
+  };
 
   useEffect(() => {
-    (async () => {
-      const distinct = await api.getDistinctPlaces();
-      const merged = [...settings.locationOrder];
-      distinct.forEach(loc => {
-        if (!merged.includes(loc)) merged.push(loc);
-      });
-      setLocations(merged);
-    })();
-  }, [settings.locationOrder, activeModal]);
-
-  useEffect(() => {
-    (async () => {
-      const distinct = await api.getDistinctSources();
-      const merged = [...settings.sourceOrder];
-      distinct.forEach(src => {
-        if (!merged.includes(src)) merged.push(src);
-      });
-      setSources(merged);
-    })();
-  }, [settings.sourceOrder, activeModal]);
+    refreshPreviews();
+  }, [settings.locationOrder, settings.sourceOrder, activeModal]);
 
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<string>) => {
     return (
@@ -145,6 +147,64 @@ export default function SettingsScreen() {
             thumbColor={settings.groupByFreshness ? '#fff' : '#ccc'}
           />
         </View>
+
+        {SHOW_DEV_SECTION && (
+          <>
+            <View style={styles.separator} />
+            <Text style={[styles.sectionHeader, { color: '#ff4444' }, settings.compactMode && styles.textSmall]}>Developer/Tester</Text>
+            
+            <View style={[styles.settingRow, settings.compactMode && styles.rowCompact]}>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Seed Dummy Data</Text>
+                <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall]}>
+                  Generate test orders, people, and items
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.devButton, { backgroundColor: '#444' }, settings.compactMode && styles.btnCompact]}
+                onPress={() => setActiveModal('seed')}
+              >
+                <FontAwesome name="database" size={settings.compactMode ? 12 : 14} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.settingRow, settings.compactMode && styles.rowCompact]}>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, { color: '#ff4444' }, settings.compactMode && styles.textSmall]}>Wipe All Data</Text>
+                <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall]}>
+                  Permanently delete everything
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.devButton, { backgroundColor: '#ff4444' }, settings.compactMode && styles.btnCompact]}
+                onPress={() => {
+                  Alert.alert(
+                    'Wipe All Data',
+                    'Are you sure? This is permanent.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { 
+                        text: 'Wipe', 
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            await api.wipeAllData();
+                            await refreshPreviews();
+                            Alert.alert('Success', 'All data wiped.');
+                          } catch (e) {
+                            Alert.alert('Error', 'Failed to wipe data.');
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }}
+              >
+                <FontAwesome name="trash" size={settings.compactMode ? 12 : 14} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Reorder Modal */}
@@ -157,34 +217,99 @@ export default function SettingsScreen() {
           <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {activeModal === 'locations' ? 'Reorder Deliveries' : 'Reorder Stores'}
-              </Text>
-              <TouchableOpacity 
-                style={styles.closeButton} 
-                onPress={() => setActiveModal(null)}
-              >
-                <Text style={styles.closeButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.modalHint}>Long press and drag to reorder items.</Text>
+                  {activeModal === 'locations' ? 'Reorder Deliveries' : activeModal === 'sources' ? 'Reorder Stores' : 'Seed Data Options'}
+                </Text>
+                <TouchableOpacity 
+                  style={styles.closeButton} 
+                  onPress={() => setActiveModal(null)}
+                >
+                  <Text style={styles.closeButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {activeModal !== 'seed' ? (
+                <>
+                  <Text style={styles.modalHint}>Long press and drag to reorder items.</Text>
 
-            <DraggableFlatList
-              data={activeModal === 'locations' ? locations : sources}
-              onDragEnd={({ data }) => {
-                if (activeModal === 'locations') {
-                  setLocations(data);
-                  updateSetting('locationOrder', data);
-                } else {
-                  setSources(data);
-                  updateSetting('sourceOrder', data);
-                }
-              }}
-              keyExtractor={(item) => item}
-              renderItem={renderDraggableItem}
-              containerStyle={{ flex: 1 }}
-            />
-          </SafeAreaView>
+                  <DraggableFlatList
+                    data={activeModal === 'locations' ? locations : sources}
+                    onDragEnd={({ data }) => {
+                      if (activeModal === 'locations') {
+                        setLocations(data);
+                        updateSetting('locationOrder', data);
+                      } else {
+                        setSources(data);
+                        updateSetting('sourceOrder', data);
+                      }
+                    }}
+                    keyExtractor={(item) => item}
+                    renderItem={renderDraggableItem}
+                    containerStyle={{ flex: 1 }}
+                  />
+                </>
+              ) : (
+                <ScrollView style={styles.seedModalContent}>
+                  <Text style={styles.modalHint}>Configure the dummy data to be generated.</Text>
+                  
+                  <View style={styles.settingRow}>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingLabel}>Number of People</Text>
+                    </View>
+                    <View style={styles.numberInputContainer}>
+                      <TouchableOpacity onPress={() => setSeedOptions(s => ({ ...s, peopleCount: Math.max(1, s.peopleCount - 1) }))} style={styles.numberBtn}>
+                        <FontAwesome name="minus" size={12} color="#fff" />
+                      </TouchableOpacity>
+                      <Text style={styles.numberText}>{seedOptions.peopleCount}</Text>
+                      <TouchableOpacity onPress={() => setSeedOptions(s => ({ ...s, peopleCount: s.peopleCount + 1 }))} style={styles.numberBtn}>
+                        <FontAwesome name="plus" size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.settingRow}>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingLabel}>Number of Items</Text>
+                    </View>
+                    <View style={styles.numberInputContainer}>
+                      <TouchableOpacity onPress={() => setSeedOptions(s => ({ ...s, itemsCount: Math.max(1, s.itemsCount - 1) }))} style={styles.numberBtn}>
+                        <FontAwesome name="minus" size={12} color="#fff" />
+                      </TouchableOpacity>
+                      <Text style={styles.numberText}>{seedOptions.itemsCount}</Text>
+                      <TouchableOpacity onPress={() => setSeedOptions(s => ({ ...s, itemsCount: s.itemsCount + 1 }))} style={styles.numberBtn}>
+                        <FontAwesome name="plus" size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.settingRow}>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingLabel}>Seed Today's Orders</Text>
+                    </View>
+                    <Switch
+                      value={seedOptions.seedOrders}
+                      onValueChange={(val) => setSeedOptions(s => ({ ...s, seedOrders: val }))}
+                      trackColor={{ false: '#555', true: '#2f95dc' }}
+                      thumbColor={seedOptions.seedOrders ? '#fff' : '#ccc'}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.seedConfirmBtn, { marginTop: 30 }]}
+                    onPress={async () => {
+                      try {
+                        await api.seedDummyData(seedOptions);
+                        setActiveModal(null);
+                        Alert.alert('Success', 'Dummy data generated.');
+                      } catch (e) {
+                        Alert.alert('Error', 'Failed to generate dummy data.');
+                      }
+                    }}
+                  >
+                    <Text style={styles.seedConfirmText}>Generate Data</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
+            </SafeAreaView>
         </GestureHandlerRootView>
       </Modal>
     </View>
@@ -302,4 +427,17 @@ const styles = StyleSheet.create({
   previewCompact: { paddingTop: 6 },
   textSmall: { fontSize: 14 },
   textExtraSmall: { fontSize: 11 },
+  devButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  seedModalContent: { padding: 10 },
+  numberInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  numberBtn: { backgroundColor: '#444', padding: 8, borderRadius: 6 },
+  numberText: { color: '#fff', fontSize: 18, fontWeight: 'bold', minWidth: 30, textAlign: 'center' },
+  seedConfirmBtn: { backgroundColor: '#2f95dc', padding: 15, borderRadius: 12, alignItems: 'center' },
+  seedConfirmText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });
