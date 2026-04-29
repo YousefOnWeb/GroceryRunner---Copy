@@ -1,7 +1,7 @@
 import { Text } from '@/components/Themed';
 import { api } from '@/db/api';
 import React, { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import { Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Alert, Keyboard } from 'react-native';
 import DropdownSelect from './DropdownSelect';
 import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
@@ -48,6 +48,7 @@ export default function CreateItemModal({
   const [aliases, setAliases] = useState<string[]>(initialAliases);
   const [newAlias, setNewAlias] = useState('');
   const [isCorrection, setIsCorrection] = useState(false);
+  const [activeFocus, setActiveFocus] = useState<string | null>(null);
   const [itemCorpus, setItemCorpus] = useState<string[]>(COMMON_GROCERY_CORPUS);
   const { settings } = useSettings();
 
@@ -134,141 +135,191 @@ export default function CreateItemModal({
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
-        <ScrollView style={styles.dialog} contentContainerStyle={styles.dialogContent}>
-          <Text style={styles.title}>{title}</Text>
-          
-          <Text style={styles.label}>Item Name</Text>
-          <SmartTextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="e.g. Milk"
-            placeholderTextColor="#888"
-            corpus={itemCorpus}
-            compactMode={settings.compactMode}
-          />
+        <ScrollView style={styles.dialog} contentContainerStyle={styles.dialogContent} keyboardShouldPersistTaps="handled">
+          <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>{title}</Text>
 
-          <Text style={styles.label}>Default Price (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={priceStr}
-            onChangeText={setPriceStr}
-            placeholder="e.g. 2.99"
-            placeholderTextColor="#888"
-            keyboardType="numeric"
-          />
+          {activeFocus && (
+            <TouchableOpacity 
+              style={[styles.exitSearchBtn, settings.compactMode && styles.exitSearchBtnCompact]} 
+              onPress={() => {
+                setActiveFocus(null);
+                Keyboard.dismiss();
+              }}
+            >
+              <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+              <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Focus Mode</Text>
+            </TouchableOpacity>
+          )}
 
-          <Text style={styles.label}>Source (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={sourceSearch || source}
-            onChangeText={(text) => {
-              setSourceSearch(text);
-              setShowSourceSuggestions(text.length > 0);
-            }}
-            onFocus={() => sourceSearch.length > 0 && setShowSourceSuggestions(true)}
-            placeholder="e.g. Walmart, Local Market"
-            placeholderTextColor="#888"
-          />
-          
-          {showSourceSuggestions && filteredSources.length > 0 && (
-            <View style={styles.suggestionsContainer}>
-              {filteredSources.map((suggestion, idx) => (
+          {(!activeFocus || activeFocus === 'name') && (
+            <>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Item Name *</Text>
+              <SmartTextInput
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                onFocus={() => setActiveFocus('name')}
+                onBlur={() => { if (!name) setActiveFocus(null); }}
+                placeholder="e.g. Milk, Bread, Apples"
+                placeholderTextColor="#888"
+                autoFocus={!isEditMode}
+                corpus={itemCorpus}
+                compactMode={settings.compactMode}
+              />
+            </>
+          )}
+
+          {!activeFocus && (
+            <>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Default Price (optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={priceStr}
+                onChangeText={setPriceStr}
+                placeholder="0.00"
+                placeholderTextColor="#888"
+                keyboardType="numeric"
+              />
+            </>
+          )}
+
+          {(!activeFocus || activeFocus === 'source') && (
+            <>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Usual Source</Text>
+              <TextInput
+                style={styles.input}
+                value={sourceSearch || source}
+                onChangeText={(text) => {
+                  setSourceSearch(text);
+                  setShowSourceSuggestions(text.length > 0);
+                }}
+                onFocus={() => {
+                  setActiveFocus('source');
+                  if (sourceSearch.length > 0) setShowSourceSuggestions(true);
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
+                    setShowSourceSuggestions(false);
+                    if (!sourceSearch) setActiveFocus(null);
+                  }, 150);
+                }}
+                placeholder="e.g. Walmart, Local Market"
+                placeholderTextColor="#888"
+              />
+              
+              {showSourceSuggestions && filteredSources.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  {filteredSources.map((suggestion, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        handleSourceSelect(suggestion);
+                        setActiveFocus(null);
+                      }}>
+                      <Text style={styles.suggestionText}>{suggestion}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+
+          {(!activeFocus || activeFocus === 'aliases') && (
+            <>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Aliases / Nicknames</Text>
+              <Text style={styles.hint}>Help recognition when typing different names.</Text>
+              
+              <View style={styles.aliasList}>
+                {aliases.map((alias, idx) => (
+                  <View key={idx} style={styles.aliasRow}>
+                    <Text style={styles.aliasText}>{alias}</Text>
+                    <TouchableOpacity onPress={() => removeAlias(idx)} style={styles.removeAliasBtn}>
+                      <FontAwesome name="times-circle" size={18} color="#ff4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.addAliasRow}>
+                <TextInput
+                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                  value={newAlias}
+                  onChangeText={setNewAlias}
+                  onFocus={() => setActiveFocus('aliases')}
+                  onBlur={() => { if (!newAlias) setActiveFocus(null); }}
+                  placeholder="Add a nickname..."
+                  placeholderTextColor="#888"
+                  onSubmitEditing={addAlias}
+                  returnKeyType="done"
+                />
                 <TouchableOpacity
-                  key={idx}
-                  style={styles.suggestionItem}
-                  onPress={() => handleSourceSelect(suggestion)}>
-                  <Text style={styles.suggestionText}>{suggestion}</Text>
+                  style={[styles.addAliasBtn, !newAlias.trim() && { opacity: 0.4 }]}
+                  onPress={addAlias}
+                  disabled={!newAlias.trim()}>
+                  <FontAwesome name="plus" size={16} color="#fff" />
                 </TouchableOpacity>
-              ))}
-            </View>
+              </View>
+            </>
           )}
 
-          <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Aliases / Nicknames</Text>
-          <Text style={styles.hint}>Help recognition when typing different names.</Text>
-          
-          <View style={styles.aliasList}>
-            {aliases.map((alias, idx) => (
-              <View key={idx} style={styles.aliasRow}>
-                <Text style={styles.aliasText}>{alias}</Text>
-                <TouchableOpacity onPress={() => removeAlias(idx)} style={styles.removeAliasBtn}>
-                  <FontAwesome name="times-circle" size={18} color="#ff4444" />
+          {!activeFocus && (
+            <>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Timing</Text>
+              <View style={[styles.dropdownContainer, settings.compactMode && styles.dropdownContainerCompact]}>
+                <DropdownSelect
+                  value={timing}
+                  options={['Fresh', 'Anytime']}
+                  onSelect={(val) => setTiming(val as 'Fresh' | 'Anytime')}
+                />
+              </View>
+
+              {isEditMode && (
+                <View style={[styles.correctionSection, settings.compactMode && styles.correctionSectionCompact]}>
+                  <View style={styles.correctionHeader}>
+                    <Text style={[styles.label, { marginTop: 0 }, settings.compactMode && styles.textExtraSmall]}>Update Mode</Text>
+                    <TouchableOpacity onPress={showPriceHelp} style={styles.helpBtn}>
+                      <FontAwesome name="question-circle" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.modeToggleRow}>
+                    <TouchableOpacity 
+                      style={[
+                        styles.modeBtn, 
+                        !isCorrection && styles.modeBtnActive,
+                        settings.compactMode && styles.modeBtnCompact
+                      ]} 
+                      onPress={() => setIsCorrection(false)}
+                    >
+                      <Text style={[styles.modeBtnText, !isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Market Change</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[
+                        styles.modeBtn, 
+                        isCorrection && styles.modeBtnActiveCorrection,
+                        settings.compactMode && styles.modeBtnCompact
+                      ]} 
+                      onPress={() => setIsCorrection(true)}
+                    >
+                      <Text style={[styles.modeBtnText, isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Correction</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              <View style={[styles.buttonRow, settings.compactMode && styles.buttonRowCompact]}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
+                  <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }, settings.compactMode && styles.submitBtnCompact]}
+                  onPress={handleSubmit}
+                  disabled={!name.trim()}>
+                  <Text style={[styles.submitBtnText, settings.compactMode && styles.textSmall]}>{submitLabel}</Text>
                 </TouchableOpacity>
               </View>
-            ))}
-          </View>
-
-          <View style={styles.addAliasRow}>
-            <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
-              value={newAlias}
-              onChangeText={setNewAlias}
-              placeholder="Add a nickname..."
-              placeholderTextColor="#888"
-              onSubmitEditing={addAlias}
-              returnKeyType="done"
-            />
-            <TouchableOpacity
-              style={[styles.addAliasBtn, !newAlias.trim() && { opacity: 0.4 }]}
-              onPress={addAlias}
-              disabled={!newAlias.trim()}>
-              <FontAwesome name="plus" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Timing</Text>
-          <View style={[styles.dropdownContainer, settings.compactMode && styles.dropdownContainerCompact]}>
-            <DropdownSelect
-              value={timing}
-              options={['Fresh', 'Anytime']}
-              onSelect={(val) => setTiming(val as 'Fresh' | 'Anytime')}
-            />
-          </View>
-
-          {isEditMode && (
-            <View style={[styles.correctionSection, settings.compactMode && styles.correctionSectionCompact]}>
-              <View style={styles.correctionHeader}>
-                <Text style={[styles.label, { marginTop: 0 }, settings.compactMode && styles.textExtraSmall]}>Update Mode</Text>
-                <TouchableOpacity onPress={showPriceHelp} style={styles.helpBtn}>
-                  <FontAwesome name="question-circle" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.modeToggleRow}>
-                <TouchableOpacity 
-                  style={[
-                    styles.modeBtn, 
-                    !isCorrection && styles.modeBtnActive,
-                    settings.compactMode && styles.modeBtnCompact
-                  ]} 
-                  onPress={() => setIsCorrection(false)}
-                >
-                  <Text style={[styles.modeBtnText, !isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Market Change</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[
-                    styles.modeBtn, 
-                    isCorrection && styles.modeBtnActiveCorrection,
-                    settings.compactMode && styles.modeBtnCompact
-                  ]} 
-                  onPress={() => setIsCorrection(true)}
-                >
-                  <Text style={[styles.modeBtnText, isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Correction</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            </>
           )}
-
-          <View style={[styles.buttonRow, settings.compactMode && styles.buttonRowCompact]}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-              <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }, settings.compactMode && styles.submitBtnCompact]}
-              onPress={handleSubmit}
-              disabled={!name.trim()}>
-              <Text style={[styles.submitBtnText, settings.compactMode && styles.textSmall]}>{submitLabel}</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       </View>
     </Modal>
@@ -300,6 +351,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 20,
   },
+  titleCompact: { fontSize: 18, marginBottom: 10 },
   label: {
     fontSize: 14,
     color: '#aaa',
@@ -463,4 +515,21 @@ const styles = StyleSheet.create({
   },
   textSmall: { fontSize: 14 },
   textExtraSmall: { fontSize: 11 },
+  exitSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  exitSearchBtnCompact: {
+    paddingVertical: 5,
+    marginBottom: 5,
+  },
+  exitSearchText: {
+    color: '#2f95dc',
+    fontWeight: 'bold',
+  },
 });

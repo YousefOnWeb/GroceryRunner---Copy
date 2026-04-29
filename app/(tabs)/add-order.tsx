@@ -10,7 +10,7 @@ import { extractDateValue, formatDateLabel, getDefaultDate, getLocalDateString }
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useSettings } from '@/utils/settings';
 import SmartTextInput from '@/components/SmartTextInput';
 import { COMMON_GROCERY_CORPUS, COMMON_NAMES_CORPUS } from '@/utils/textMatching';
@@ -31,6 +31,7 @@ export default function AddOrderScreen() {
   // Item search state
   const [searchQuery, setSearchQuery] = useState('');
   const [itemModalVisible, setItemModalVisible] = useState(false);
+  const [activeSearch, setActiveSearch] = useState<'person' | 'item' | 'place' | null>(null);
 
   // Person search state
   const [personSearchQuery, setPersonSearchQuery] = useState('');
@@ -61,6 +62,19 @@ export default function AddOrderScreen() {
     return [...new Set([...dbItems, ...COMMON_GROCERY_CORPUS])];
   }, [catalog]);
 
+  const placesCorpus = useMemo(() => {
+    return [...new Set(people?.map(p => p.typicalPlace).filter((p): p is string => !!p) || [])];
+  }, [people]);
+
+  const filteredPlaces = useMemo(() => {
+    if (!deliveryPlace.trim()) return [];
+    return placesCorpus.filter(p => p.toLowerCase().includes(deliveryPlace.toLowerCase()) && p.toLowerCase() !== deliveryPlace.toLowerCase());
+  }, [deliveryPlace, placesCorpus]);
+
+  const handleBlur = () => {
+    setTimeout(() => setActiveSearch(null), 150);
+  };
+
   const loadExistingOrder = () => {
     if (!existingOrder || !allOrderItems || !catalog) return;
     const itemsForOrder = allOrderItems.filter(oi => oi.orderId === existingOrder.id);
@@ -71,22 +85,19 @@ export default function AddOrderScreen() {
     
     setCart(newCart);
     setEditModeOrderId(existingOrder.id);
-    // Load existing delivery place
     if (existingOrder.deliveryPlace) {
       setDeliveryPlace(existingOrder.deliveryPlace);
     }
   };
 
-  /** When a person is selected, auto-fill delivery place from their typical place */
-  const handleSelectPerson = (personId: string) => {
+  const selectPerson = (personId: string) => {
     setSelectedPersonId(personId);
     const person = people?.find(p => p.id === personId);
-    if (person?.typicalPlace) {
-      setDeliveryPlace(person.typicalPlace);
-    } else {
-      setDeliveryPlace('');
-    }
+    if (person?.typicalPlace) setDeliveryPlace(person.typicalPlace);
+    setActiveSearch(null);
   };
+
+  const selectedPerson = useMemo(() => people?.find(p => p.id === selectedPersonId), [people, selectedPersonId]);
 
   const addToCart = (itemObj: any) => {
     setCart((prev) => {
@@ -115,7 +126,7 @@ export default function AddOrderScreen() {
     }
     
     if (existingOrder && editModeOrderId !== existingOrder.id) {
-      Alert.alert('Cannot Add', 'This person already has an order for this date. Please edit the existing order instead.');
+      Alert.alert('Cannot Add', 'This person already has an order for this date.');
       return;
     }
 
@@ -125,21 +136,15 @@ export default function AddOrderScreen() {
     }
 
     try {
-      const orderLines = cart.map((c) => {
-        return {
+      const orderLines = cart.map((c) => ({
           itemId: c.item.id,
           quantity: c.quantity,
           unitPrice: c.item.defaultPrice ?? null,
-        };
-      });
+      }));
 
       if (editModeOrderId) {
-        if (cart.length === 0) {
-          Alert.alert('Notice', 'Cart is empty. If you want to delete the order, you should delete it from the run tab (Feature coming soon).');
-          return;
-        }
         await api.updateOrder(editModeOrderId, selectedPersonId, orderLines, deliveryPlace || null);
-        Alert.alert('Success', 'Order updated successfully (Note: all items have been reset to Unpaid)');
+        Alert.alert('Success', 'Order updated successfully');
       } else {
         await api.createOrder(selectedPersonId, targetDateDb, orderLines, deliveryPlace || null);
         Alert.alert('Success', 'Order saved successfully');
@@ -172,7 +177,7 @@ export default function AddOrderScreen() {
   const handleCreatePersonDone = (newPersonId?: string) => {
     setPersonModalVisible(false);
     if (newPersonId) {
-      handleSelectPerson(newPersonId);
+      selectPerson(newPersonId);
       setPersonSearchQuery('');
     }
   };
@@ -198,11 +203,11 @@ export default function AddOrderScreen() {
     ].join(' ').toLowerCase();
     return searchString.includes(q);
   }) || [];
+  
   const exactItemMatch = filteredCatalog.find(i => i.name.toLowerCase() === searchQuery.toLowerCase().trim());
 
-  // Person search: match by primary name OR alias
   const filteredPeople = useMemo(() => {
-    if (!people || !personSearchQuery.trim()) return people || [];
+    if (!people || !personSearchQuery.trim()) return [];
     const q = personSearchQuery.toLowerCase().trim();
 
     // Get person IDs that match by alias
@@ -226,21 +231,17 @@ export default function AddOrderScreen() {
   const exactPersonMatch = useMemo(() => {
     const q = personSearchQuery.toLowerCase().trim();
     if (!q) return undefined;
-    // Exact match by primary name
     const byName = people?.find(p => p.name.toLowerCase() === q);
     if (byName) return byName;
-    // Exact match by alias → resolve to primary person
     const aliasMatch = allAliases?.find(a => a.alias.toLowerCase() === q);
     if (aliasMatch) return people?.find(p => p.id === aliasMatch.personId);
     return undefined;
   }, [people, allAliases, personSearchQuery]);
 
-  // Get alias that matched for display hint
   const getMatchingAlias = (personId: string): string | null => {
     if (!personSearchQuery.trim()) return null;
     const q = personSearchQuery.toLowerCase().trim();
     const person = people?.find(p => p.id === personId);
-    // Only show alias hint if the name itself doesn't match
     if (person && person.name.toLowerCase().includes(q)) return null;
     const match = allAliases?.find(a => a.personId === personId && a.alias.toLowerCase().includes(q));
     return match?.alias || null;
@@ -252,189 +253,170 @@ export default function AddOrderScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
-      <ScrollView keyboardShouldPersistTaps="handled">
-        
-        {/* 1. Who is this for? */}
-        <View style={[styles.section, settings.compactMode && styles.sectionCompact, { zIndex: 20 }]}>
-          <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>1. Who is this for?</Text>
-          
-          {selectedPersonId ? (
-            <View style={[styles.selectedRow, settings.compactMode && styles.paddingSmall]}>
-              <Text style={[styles.selectedText, settings.compactMode && styles.textSmall]}>
-                {people?.find(p => p.id === selectedPersonId)?.name}
-              </Text>
-              <TouchableOpacity onPress={() => { setSelectedPersonId(null); setEditModeOrderId(null); setCart([]); setDeliveryPlace(''); }} style={[styles.changeBtn, settings.compactMode && styles.paddingSmall]}>
-                <Text style={[styles.changeBtnText, settings.compactMode && styles.textExtraSmall]}>Change</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
-                <SmartTextInput
-                  style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
-                  value={personSearchQuery}
-                  onChangeText={setPersonSearchQuery}
-                  placeholder="Search person or nickname..."
-                  placeholderTextColor="#888"
-                  corpus={personCorpus}
-                  compactMode={settings.compactMode}
-                />
-                {personSearchQuery.trim().length > 0 && !exactPersonMatch && (
-                  <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setPersonModalVisible(true)}>
-                    <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>Create "{personSearchQuery.trim()}"</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {filteredPeople.length > 0 && (
-                <View style={[styles.grid, settings.compactMode && styles.gridCompact]}>
-                  {filteredPeople.slice(0, 8).map((p) => {
-                    const matchedAlias = getMatchingAlias(p.id);
-                    return (
-                      <TouchableOpacity key={p.id} style={[styles.gridItemPerson, settings.compactMode && styles.gridItemPersonCompact]} onPress={() => handleSelectPerson(p.id)}>
-                        <Text style={[styles.gridItemName, settings.compactMode && styles.textExtraSmall]}>{p.name}</Text>
-                        {matchedAlias && (
-                          <Text style={styles.gridItemAlias}>({matchedAlias})</Text>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </>
-          )}
-        </View>
-
-        {/* 2. When? */}
-        <View style={[styles.section, settings.compactMode && styles.sectionCompact, { zIndex: 10 }]}>
-          <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>2. When?</Text>
-          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
-            <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate)}</Text>
-            <FontAwesome name="calendar" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+        {activeSearch && (
+          <TouchableOpacity 
+            style={[styles.exitSearchBtn, settings.compactMode && styles.exitSearchBtnCompact]} 
+            onPress={() => {
+              setActiveSearch(null);
+              Keyboard.dismiss();
+            }}
+          >
+            <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Search Mode</Text>
           </TouchableOpacity>
-        </View>
-
-        {showDatePicker && (
-          <DateTimePicker
-            value={targetDate}
-            mode="date"
-            display="default"
-            onChange={onDateChange}
-          />
         )}
 
-        {/* 2.5 Delivery Place */}
-        {selectedPersonId && (
+        {(!activeSearch || activeSearch === 'person') && (
+          <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>1. Who is this for?</Text>
+            <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
+              <SmartTextInput
+                style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
+                value={personSearchQuery}
+                onChangeText={setPersonSearchQuery}
+                onFocus={() => setActiveSearch('person')}
+                onBlur={handleBlur}
+                placeholder="Search person..."
+                placeholderTextColor="#888"
+                corpus={personCorpus}
+                compactMode={settings.compactMode}
+              />
+              {personSearchQuery.trim().length > 0 && !exactPersonMatch && (
+                <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setPersonModalVisible(true)}>
+                  <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {activeSearch === 'person' && filteredPeople.length > 0 && (
+              <View style={[styles.grid, settings.compactMode && styles.gridCompact, { marginTop: 10 }]}>
+                {filteredPeople.map((p) => {
+                  const matchedAlias = getMatchingAlias(p.id);
+                  return (
+                    <TouchableOpacity key={p.id} style={[styles.gridItemPerson, settings.compactMode && styles.gridItemPersonCompact]} onPress={() => selectPerson(p.id)}>
+                      <Text style={[styles.gridItemName, settings.compactMode && styles.textSmall]}>{p.name}</Text>
+                      {matchedAlias && (
+                        <Text style={styles.gridItemAlias}>({matchedAlias})</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {!activeSearch && selectedPerson && (
+              <View style={styles.selectedRow}>
+                <Text style={styles.selectedText}>{selectedPerson.name}</Text>
+                <TouchableOpacity onPress={() => { setSelectedPersonId(null); setPersonSearchQuery(''); }}><Text style={styles.changeBtnText}>Change</Text></TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {!activeSearch && (
+          <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>2. When?</Text>
+            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
+              <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate)}</Text>
+              <FontAwesome name="calendar" size={16} color="#2f95dc" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {showDatePicker && <DateTimePicker value={targetDate} mode="date" display="default" onChange={onDateChange} />}
+
+        {selectedPersonId && (!activeSearch || activeSearch === 'place') && (
           <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
             <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>📍 Deliver to</Text>
             <TextInput
               style={[styles.input, settings.compactMode && styles.inputCompact]}
               value={deliveryPlace}
               onChangeText={setDeliveryPlace}
-              placeholder="e.g. Building A, Floor 3"
+              onFocus={() => setActiveSearch('place')}
+              onBlur={handleBlur}
+              placeholder="e.g. Building A"
               placeholderTextColor="#888"
             />
-          </View>
-        )}
-
-        {/* Edit Mode Banner */}
-        {existingOrder && editModeOrderId !== existingOrder.id && (
-          <View style={styles.warningBanner}>
-            <Text style={styles.warningText}>⚠️ An order already exists for this person on this date.</Text>
-            <TouchableOpacity style={styles.loadBtn} onPress={loadExistingOrder}>
-              <Text style={styles.loadBtnText}>Edit Existing Order</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* 3. What do they want? */}
-        <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
-          <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>
-            3. What do they want? {editModeOrderId && <Text style={{color: '#ff9800'}}>(Editing)</Text>}
-          </Text>
-          <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
-            <SmartTextInput
-              style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search or add item..."
-              placeholderTextColor="#888"
-              corpus={itemCorpus}
-              compactMode={settings.compactMode}
-            />
-            {searchQuery.trim().length > 0 && !exactItemMatch && (
-              <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setItemModalVisible(true)}>
-                <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>Create "{searchQuery.trim()}"</Text>
-              </TouchableOpacity>
+            {activeSearch === 'place' && filteredPlaces.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                {filteredPlaces.map((s, i) => (
+                  <TouchableOpacity key={i} style={styles.suggestionItem} onPress={() => { setDeliveryPlace(s); setActiveSearch(null); }}>
+                    <Text style={styles.suggestionText}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
           </View>
+        )}
 
-          <View style={[styles.grid, settings.compactMode && styles.gridCompact]}>
-            {filteredCatalog.slice(0, 12).map((item) => {
-              const inCart = cart.find((c) => c.item.id === item.id);
-              return (
-                <TouchableOpacity key={item.id} style={[styles.gridItem, settings.compactMode && styles.gridItemCompact]} onPress={() => addToCart(item)}>
-                  <Text style={[styles.gridItemName, settings.compactMode && styles.textSmall]}>{item.name}</Text>
-                  {inCart && (
-                    <View style={[styles.badge, settings.compactMode && styles.badgeCompact]}>
-                      <Text style={[styles.badgeText, settings.compactMode && styles.textExtraSmall]}>{inCart.quantity}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+        {!activeSearch && existingOrder && editModeOrderId !== existingOrder.id && (
+          <View style={styles.warningBanner}>
+            <Text style={styles.warningText}>⚠️ Order exists.</Text>
+            <TouchableOpacity style={styles.loadBtn} onPress={loadExistingOrder}><Text style={styles.loadBtnText}>Edit</Text></TouchableOpacity>
           </View>
-        </View>
+        )}
 
-        {/* Cart Review */}
-        {cart.length > 0 && (
+        {(!activeSearch || activeSearch === 'item') && (
           <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>Cart Review</Text>
-            {cart.map((c) => {
-              return (
-                <View key={c.item.id} style={[styles.cartRow, settings.compactMode && styles.cartRowCompact]}>
-                  <Text style={[styles.cartText, settings.compactMode && styles.textSmall]}>{c.item.name}</Text>
-                  <View style={styles.cartActions}>
-                    <TouchableOpacity onPress={() => removeFromCart(c.item.id)} style={[styles.cartBtn, settings.compactMode && styles.paddingSmall]}>
-                      <FontAwesome name="minus" size={settings.compactMode ? 12 : 16} color="#000" />
-                    </TouchableOpacity>
-                    <Text style={[styles.cartQuantity, settings.compactMode && styles.textSmall]}>{c.quantity}</Text>
-                    <TouchableOpacity onPress={() => addToCart(c.item)} style={[styles.cartBtn, settings.compactMode && styles.paddingSmall]}>
-                      <FontAwesome name="plus" size={settings.compactMode ? 12 : 16} color="#000" />
-                    </TouchableOpacity>
-                  </View>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>3. Items</Text>
+            <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
+              <SmartTextInput
+                style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onFocus={() => setActiveSearch('item')}
+                onBlur={handleBlur}
+                placeholder="Search items..."
+                placeholderTextColor="#888"
+                corpus={itemCorpus}
+                compactMode={settings.compactMode}
+              />
+              {searchQuery.trim().length > 0 && !exactItemMatch && (
+                <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setItemModalVisible(true)}>
+                  <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={[styles.grid, settings.compactMode && styles.gridCompact]}>
+              {(activeSearch === 'item' ? filteredCatalog : filteredCatalog.slice(0, 12)).map((item) => {
+                const inCart = cart.find((c) => c.item.id === item.id);
+                return (
+                  <TouchableOpacity key={item.id} style={[styles.gridItem, settings.compactMode && styles.gridItemCompact]} onPress={() => addToCart(item)}>
+                    <Text style={[styles.gridItemName, settings.compactMode && styles.textSmall]}>{item.name}</Text>
+                    {inCart && <View style={[styles.badge, settings.compactMode && styles.badgeCompact]}><Text>{inCart.quantity}</Text></View>}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {!activeSearch && cart.length > 0 && (
+          <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>Cart</Text>
+            {cart.map((c) => (
+              <View key={c.item.id} style={styles.cartRow}>
+                <Text style={styles.cartText}>{c.item.name}</Text>
+                <View style={styles.cartActions}>
+                  <TouchableOpacity onPress={() => removeFromCart(c.item.id)} style={styles.cartBtn}><FontAwesome name="minus" size={12} /></TouchableOpacity>
+                  <Text style={styles.cartQuantity}>{c.quantity}</Text>
+                  <TouchableOpacity onPress={() => addToCart(c.item)} style={styles.cartBtn}><FontAwesome name="plus" size={12} /></TouchableOpacity>
                 </View>
-              );
-            })}
+              </View>
+            ))}
           </View>
         )}
       </ScrollView>
 
-      <TouchableOpacity 
-        style={[
-          styles.saveButton, 
-          settings.compactMode && styles.saveButtonCompact,
-          existingOrder && editModeOrderId !== existingOrder.id && styles.saveButtonDisabled
-        ]} 
-        onPress={handleSaveOrder}
-        disabled={!!(existingOrder && editModeOrderId !== existingOrder.id)}>
-        <Text style={[styles.saveButtonText, settings.compactMode && styles.textSmall]}>{editModeOrderId ? 'Save Edited Order' : 'Save Order'}</Text>
-      </TouchableOpacity>
+      {!activeSearch && (
+        <TouchableOpacity style={styles.saveButton} onPress={handleSaveOrder}>
+          <Text style={styles.saveButtonText}>{editModeOrderId ? 'Save Edit' : 'Save Order'}</Text>
+        </TouchableOpacity>
+      )}
 
-      <CreateItemModal
-        visible={itemModalVisible}
-        initialName={searchQuery}
-        onCancel={() => setItemModalVisible(false)}
-        onSubmit={handleCreateItemSubmit}
-      />
-
-      <PersonModal
-        visible={personModalVisible}
-        mode="create"
-        initialName={personSearchQuery}
-        onCancel={() => setPersonModalVisible(false)}
-        onDone={handleCreatePersonDone}
-      />
+      <CreateItemModal visible={itemModalVisible} initialName={searchQuery} onCancel={() => setItemModalVisible(false)} onSubmit={handleCreateItemSubmit} />
+      <PersonModal visible={personModalVisible} mode="create" initialName={personSearchQuery} onCancel={() => setPersonModalVisible(false)} onDone={handleCreatePersonDone} />
     </KeyboardAvoidingView>
   );
 }
@@ -443,121 +425,49 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   section: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#333' },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#fff' },
-  selectedRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#333',
-    padding: 12,
-    borderRadius: 8,
-  },
+  selectedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#333', padding: 12, borderRadius: 8 },
   selectedText: { color: '#2f95dc', fontSize: 18, fontWeight: 'bold' },
-  changeBtn: { padding: 5 },
-  changeBtnText: { color: '#aaa', fontSize: 14, fontWeight: 'bold' },
-  input: {
-    backgroundColor: '#333',
-    color: '#fff',
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 16,
-    marginBottom: 10,
-  },
+  changeBtnText: { color: '#aaa', fontSize: 14 },
+  input: { backgroundColor: '#333', color: '#fff', padding: 12, borderRadius: 8, fontSize: 16, marginBottom: 10 },
   searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   addButton: { marginLeft: 10, backgroundColor: '#2f95dc', padding: 12, borderRadius: 8 },
   addButtonText: { color: '#fff', fontWeight: 'bold' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gridItem: {
-    backgroundColor: '#444',
-    padding: 15,
-    borderRadius: 10,
-    minWidth: '30%',
-    position: 'relative',
-  },
-  gridItemPerson: {
-    backgroundColor: '#444',
-    padding: 10,
-    borderRadius: 20,
-    alignItems: 'center',
-  },
+  gridItem: { backgroundColor: '#444', padding: 15, borderRadius: 10, minWidth: '30%' },
+  gridItemPerson: { backgroundColor: '#444', padding: 10, borderRadius: 20 },
   gridItemName: { color: '#fff', textAlign: 'center' },
-  gridItemAlias: { color: '#8bb8e8', textAlign: 'center', fontSize: 11, fontStyle: 'italic', marginTop: 2 },
-  badge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#ff4444',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  badge: { position: 'absolute', top: -5, right: -5, backgroundColor: '#ff4444', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   cartRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   cartText: { fontSize: 16, color: '#fff' },
   cartActions: { flexDirection: 'row', alignItems: 'center' },
   cartBtn: { backgroundColor: '#ccc', padding: 8, borderRadius: 15 },
   cartQuantity: { marginHorizontal: 15, fontSize: 18, color: '#fff' },
-  saveButton: {
-    backgroundColor: '#28a745',
-    padding: 20,
-    alignItems: 'center',
-    margin: 15,
-    borderRadius: 10,
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#999',
-    opacity: 0.6,
-  },
+  saveButton: { backgroundColor: '#28a745', padding: 20, alignItems: 'center', margin: 15, borderRadius: 10 },
   saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  warningBanner: {
-    backgroundColor: '#4a2f00',
-    padding: 15,
-    marginHorizontal: 15,
-    marginTop: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ff9800',
-  },
-  warningText: {
-    color: '#fff',
-    marginBottom: 10,
-    fontWeight: 'bold',
-  },
-  loadBtn: {
-    backgroundColor: '#ff9800',
-    padding: 10,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  loadBtnText: {
-    color: '#000',
-    fontWeight: 'bold',
-  },
-  dateDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#333',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 10,
-  },
-  dateDisplayText: { color: '#fff', fontSize: 16, fontWeight: '500' },
-  
-  // Compact Modifiers
+  warningBanner: { backgroundColor: '#4a2f00', padding: 15, marginHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: '#ff9800' },
+  warningText: { color: '#fff', marginBottom: 10 },
+  loadBtn: { backgroundColor: '#ff9800', padding: 10, borderRadius: 5, alignItems: 'center' },
+  loadBtnText: { color: '#000', fontWeight: 'bold' },
+  dateDisplay: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#333', padding: 12, borderRadius: 8, gap: 10 },
+  dateDisplayText: { color: '#fff', fontSize: 16 },
+  exitSearchBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 15, backgroundColor: '#1a1a1a', borderBottomWidth: 1, borderBottomColor: '#333' },
+  exitSearchText: { color: '#2f95dc', fontWeight: 'bold' },
+  exitSearchBtnCompact: { padding: 8 },
+  suggestionsContainer: { backgroundColor: '#222', borderRadius: 8, padding: 5, marginTop: 5 },
+  suggestionItem: { padding: 10 },
+  suggestionText: { color: '#fff' },
+  gridItemAlias: { color: '#8bb8e8', textAlign: 'center', fontSize: 11, fontStyle: 'italic', marginTop: 2 },
   sectionCompact: { padding: 10 },
-  inputCompact: { padding: 8, fontSize: 14, marginBottom: 5 },
+  inputCompact: { padding: 8, fontSize: 14 },
   searchRowCompact: { marginBottom: 5 },
   addButtonCompact: { padding: 8 },
   gridCompact: { gap: 6 },
   gridItemCompact: { padding: 10 },
   gridItemPersonCompact: { padding: 6 },
   badgeCompact: { width: 18, height: 18, top: -4, right: -4 },
-  dateDisplayCompact: { paddingVertical: 4, paddingHorizontal: 8 },
+  dateDisplayCompact: { padding: 8 },
   cartRowCompact: { marginBottom: 6 },
   saveButtonCompact: { padding: 12, margin: 8 },
   textSmall: { fontSize: 14 },
   textExtraSmall: { fontSize: 11 },
-  paddingSmall: { padding: 2 },
 });

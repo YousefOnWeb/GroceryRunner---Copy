@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useSettings } from '@/utils/settings';
 import { Text, View } from '@/components/Themed';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -38,6 +38,7 @@ export default function StatsScreen() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [mergeModalVisible, setMergeModalVisible] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Derive Places and Sources
   const places = useMemo(() => {
@@ -296,28 +297,45 @@ export default function StatsScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}>
-      <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
-        
-        {/* STATISTICS SECTION */}
-        <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>📊 App Statistics</Text>
-        {stats && (
-          <View style={[styles.statsCard, settings.compactMode && styles.statsCardCompact]}>
-            <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>Total Money Handled: <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>${stats.totalSpent.toFixed(2)}</Text></Text>
-            <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>Total Orders Created: <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>{stats.totalOrders}</Text></Text>
-            
-            <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>🏆 Top Spenders</Text>
-            {stats.topSpenders.map((p, idx) => (
-              <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {p.name} - ${p.total.toFixed(2)}</Text>
-            ))}
-
-            <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>🔥 Most Popular Items</Text>
-            {stats.topItems.map((i, idx) => (
-              <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {i.name} ({i.qty} ordered)</Text>
-            ))}
-          </View>
+      <ScrollView 
+        contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {isSearching && (
+          <TouchableOpacity 
+            style={[styles.exitSearchBtn, settings.compactMode && styles.exitSearchBtnCompact]} 
+            onPress={() => { 
+              setIsSearching(false); 
+              setSearchQuery(''); 
+              Keyboard.dismiss();
+            }}
+          >
+            <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Search Mode</Text>
+          </TouchableOpacity>
         )}
 
-        <View style={styles.separator} />
+        {/* STATISTICS SECTION */}
+        {!isSearching && stats && (
+          <View>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>📊 App Statistics</Text>
+            <View style={[styles.statsCard, settings.compactMode && styles.statsCardCompact]}>
+              <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>Total Money Handled: <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>${stats.totalSpent.toFixed(2)}</Text></Text>
+              <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>Total Orders Created: <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>{stats.totalOrders}</Text></Text>
+              
+              <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>🏆 Top Spenders</Text>
+              {stats.topSpenders.map((p, idx) => (
+                <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {p.name} - ${p.total.toFixed(2)}</Text>
+              ))}
+
+              <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>🔥 Most Popular Items</Text>
+              {stats.topItems.map((i, idx) => (
+                <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {i.name} ({i.qty} ordered)</Text>
+              ))}
+            </View>
+            <View style={styles.separator} />
+          </View>
+        )}
 
         {/* DICTIONARY SECTION */}
         {!selectionMode ? (
@@ -362,6 +380,8 @@ export default function StatsScreen() {
           style={[styles.dictionarySearch, settings.compactMode && styles.dictionarySearchCompact]}
           value={searchQuery}
           onChangeText={setSearchQuery}
+          onFocus={() => setIsSearching(true)}
+          onBlur={() => { if (!searchQuery) setIsSearching(false); }}
           placeholder={`Search ${activeTab.toLowerCase()}...`}
           placeholderTextColor="#888"
         />
@@ -425,7 +445,25 @@ const styles = StyleSheet.create({
   subTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginTop: 15, marginBottom: 10 },
   listItem: { color: '#ddd', fontSize: 15, marginLeft: 10, marginBottom: 5 },
   separator: { height: 1, backgroundColor: '#555', marginVertical: 20 },
-  helperText: { color: '#888', marginBottom: 15 },
+  helperText: { color: '#888', fontSize: 13, textAlign: 'center', marginBottom: 15, fontStyle: 'italic' },
+  exitSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 15,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    marginBottom: 10,
+  },
+  exitSearchBtnCompact: {
+    padding: 8,
+    marginBottom: 5,
+  },
+  exitSearchText: {
+    color: '#2f95dc',
+    fontWeight: 'bold',
+  },
   
   dictionaryHeader: { marginBottom: 10 },
   tabRow: { flexDirection: 'row', backgroundColor: '#222', borderRadius: 8, padding: 4, marginBottom: 10 },

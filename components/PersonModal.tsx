@@ -1,7 +1,7 @@
 import { Text } from '@/components/Themed';
 import { api } from '@/db/api';
 import React, { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Keyboard } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSettings } from '@/utils/settings';
 import CreditLogModal from './CreditLogModal';
@@ -46,6 +46,7 @@ export default function PersonModal({
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustNote, setAdjustNote] = useState('');
   const [logVisible, setLogVisible] = useState(false);
+  const [activeFocus, setActiveFocus] = useState<string | null>(null);
   const [namesCorpus, setNamesCorpus] = useState<string[]>(COMMON_NAMES_CORPUS);
   const { settings } = useSettings();
 
@@ -179,82 +180,121 @@ export default function PersonModal({
             {mode === 'create' ? 'Add New Person' : `Edit: ${initialName}`}
           </Text>
 
+          {activeFocus && (
+            <TouchableOpacity 
+              style={[styles.exitSearchBtn, settings.compactMode && styles.exitSearchBtnCompact]} 
+              onPress={() => {
+                setActiveFocus(null);
+                Keyboard.dismiss();
+              }}
+            >
+              <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+              <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Focus Mode</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Name */}
-          <Text style={styles.label}>Name</Text>
-          <SmartTextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Primary name"
-            placeholderTextColor="#888"
-            corpus={namesCorpus}
-            compactMode={settings.compactMode}
-          />
+          {(!activeFocus || activeFocus === 'name') && (
+            <>
+              <Text style={styles.label}>Name</Text>
+              <SmartTextInput
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                onFocus={() => setActiveFocus('name')}
+                onBlur={() => { if (!name) setActiveFocus(null); }}
+                placeholder="Primary name"
+                placeholderTextColor="#888"
+                corpus={namesCorpus}
+                compactMode={settings.compactMode}
+              />
+            </>
+          )}
 
           {/* Typical Place */}
-          <Text style={styles.label}>Typical Location</Text>
-          <TextInput
-            style={styles.input}
-            value={place}
-            onChangeText={(text) => {
-              setPlace(text);
-              setShowPlaceSuggestions(text.length > 0);
-            }}
-            onFocus={() => place.length > 0 && setShowPlaceSuggestions(true)}
-            placeholder="e.g. Building A, Floor 3"
-            placeholderTextColor="#888"
-          />
-          {showPlaceSuggestions && filteredPlaces.length > 0 && (
-            <View style={styles.suggestionsContainer}>
-              {filteredPlaces.map((suggestion, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.suggestionItem}
-                  onPress={() => {
-                    setPlace(suggestion);
+          {(!activeFocus || activeFocus === 'place') && (
+            <>
+              <Text style={styles.label}>Typical Location</Text>
+              <TextInput
+                style={styles.input}
+                value={place}
+                onChangeText={(text) => {
+                  setPlace(text);
+                  setShowPlaceSuggestions(text.length > 0);
+                }}
+                onFocus={() => {
+                  setActiveFocus('place');
+                  if (place.length > 0) setShowPlaceSuggestions(true);
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
                     setShowPlaceSuggestions(false);
-                  }}>
-                  <Text style={styles.suggestionText}>{suggestion}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    if (!place) setActiveFocus(null);
+                  }, 150);
+                }}
+                placeholder="e.g. Building A, Floor 3"
+                placeholderTextColor="#888"
+              />
+              {showPlaceSuggestions && filteredPlaces.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  {filteredPlaces.map((suggestion, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        setPlace(suggestion);
+                        setShowPlaceSuggestions(false);
+                        setActiveFocus(null);
+                      }}>
+                      <Text style={styles.suggestionText}>{suggestion}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
           )}
 
           {/* Nicknames/Aliases */}
-          <Text style={styles.label}>Nicknames / Aliases</Text>
-          <Text style={styles.hint}>
-            These help the app recognize the same person when you type a different name.
-          </Text>
-          {aliases.map((alias, idx) => (
-            <View key={idx} style={styles.aliasRow}>
-              <Text style={styles.aliasText}>{alias}</Text>
-              <TouchableOpacity onPress={() => removeAlias(idx)} style={styles.removeAliasBtn}>
-                <FontAwesome name="times-circle" size={20} color="#ff4444" />
-              </TouchableOpacity>
-            </View>
-          ))}
-          <View style={styles.addAliasRow}>
-            <SmartTextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
-              value={newAlias}
-              onChangeText={setNewAlias}
-              placeholder="Add a nickname..."
-              placeholderTextColor="#888"
-              onSubmitEditing={addAlias}
-              returnKeyType="done"
-              corpus={namesCorpus}
-              compactMode={settings.compactMode}
-            />
-            <TouchableOpacity
-              style={[styles.addAliasBtn, !newAlias.trim() && { opacity: 0.4 }]}
-              onPress={addAlias}
-              disabled={!newAlias.trim()}>
-              <FontAwesome name="plus" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          {(!activeFocus || activeFocus === 'aliases') && (
+            <>
+              <Text style={styles.label}>Nicknames / Aliases</Text>
+              <Text style={styles.hint}>
+                These help the app recognize the same person when you type a different name.
+              </Text>
+              {aliases.map((alias, idx) => (
+                <View key={idx} style={styles.aliasRow}>
+                  <Text style={styles.aliasText}>{alias}</Text>
+                  <TouchableOpacity onPress={() => removeAlias(idx)} style={styles.removeAliasBtn}>
+                    <FontAwesome name="times-circle" size={20} color="#ff4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <View style={styles.addAliasRow}>
+                <SmartTextInput
+                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                  value={newAlias}
+                  onChangeText={setNewAlias}
+                  onFocus={() => setActiveFocus('aliases')}
+                  onBlur={() => { if (!newAlias) setActiveFocus(null); }}
+                  placeholder="Add a nickname..."
+                  placeholderTextColor="#888"
+                  onSubmitEditing={addAlias}
+                  returnKeyType="done"
+                  corpus={namesCorpus}
+                  compactMode={settings.compactMode}
+                />
+                <TouchableOpacity
+                  style={[styles.addAliasBtn, !newAlias.trim() && { opacity: 0.4 }]}
+                  onPress={addAlias}
+                  disabled={!newAlias.trim()}>
+                  <FontAwesome name="plus" size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
 
           {/* Credit Adjustment (edit mode only) */}
-          {mode === 'edit' && (
+          {!activeFocus && mode === 'edit' && (
             <>
               <View style={styles.divider} />
               <Text style={styles.label}>Adjust Credit</Text>
@@ -306,24 +346,26 @@ export default function PersonModal({
           )}
 
           {/* Action Buttons */}
-          <View style={[styles.buttonRow, settings.compactMode && styles.buttonRowCompact]}>
-            {mode === 'edit' && (
-              <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-                <FontAwesome name="trash" size={settings.compactMode ? 14 : 18} color="#ff4444" />
-                <Text style={[styles.deleteBtnText, settings.compactMode && styles.textSmall]}>Delete</Text>
+          {!activeFocus && (
+            <View style={[styles.buttonRow, settings.compactMode && styles.buttonRowCompact]}>
+              {mode === 'edit' && (
+                <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+                  <FontAwesome name="trash" size={settings.compactMode ? 14 : 18} color="#ff4444" />
+                  <Text style={[styles.deleteBtnText, settings.compactMode && styles.textSmall]}>Delete</Text>
+                </TouchableOpacity>
+              )}
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
+                <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>Cancel</Text>
               </TouchableOpacity>
-            )}
-            <View style={{ flex: 1 }} />
-            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-              <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }, settings.compactMode && styles.submitBtnCompact]}
-              onPress={handleSubmit}
-              disabled={!name.trim()}>
-              <Text style={[styles.submitBtnText, settings.compactMode && styles.textSmall]}>{mode === 'create' ? 'Add Person' : 'Save Changes'}</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }, settings.compactMode && styles.submitBtnCompact]}
+                onPress={handleSubmit}
+                disabled={!name.trim()}>
+                <Text style={[styles.submitBtnText, settings.compactMode && styles.textSmall]}>{mode === 'create' ? 'Add Person' : 'Save Changes'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       </View>
 
@@ -527,4 +569,21 @@ const styles = StyleSheet.create({
   submitBtnCompact: { paddingVertical: 8, paddingHorizontal: 15 },
   textSmall: { fontSize: 14 },
   textExtraSmall: { fontSize: 11 },
+  exitSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  exitSearchBtnCompact: {
+    paddingVertical: 5,
+    marginBottom: 5,
+  },
+  exitSearchText: {
+    color: '#2f95dc',
+    fontWeight: 'bold',
+  },
 });

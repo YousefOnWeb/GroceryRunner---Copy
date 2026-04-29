@@ -11,7 +11,7 @@ import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View as RNView, KeyboardAvoidingView, AppState } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View as RNView, KeyboardAvoidingView, AppState, Keyboard } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 
@@ -21,6 +21,7 @@ export default function TheRunScreen() {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [paidItems, setPaidItems] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   // Unknown price notes modal
   const [unknownPricePerson, setUnknownPricePerson] = useState<{ id: string; name: string } | null>(null);
@@ -449,14 +450,35 @@ export default function TheRunScreen() {
         />
       )}
 
-      <ScrollView style={[styles.content, settings.compactMode && styles.contentCompact]}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>🛍️ The Shopping List</Text>
-          {listTotal > 0 && (
-            <Text style={[styles.sectionTotal, settings.compactMode && styles.textSmall]}>Total: ${listTotal.toFixed(2)}</Text>
-          )}
-        </View>
-        {Object.entries(aggregatedItems).map(([timingKey, sources]) => (
+      <ScrollView 
+        style={[styles.content, settings.compactMode && styles.contentCompact]}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {isSearching && (
+          <TouchableOpacity 
+            style={[styles.exitSearchBtn, settings.compactMode && styles.exitSearchBtnCompact]} 
+            onPress={() => { 
+              setIsSearching(false); 
+              setSearchQuery(''); 
+              Keyboard.dismiss();
+            }}
+          >
+            <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Search Mode</Text>
+          </TouchableOpacity>
+        )}
+
+        {!isSearching && (
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>🛍️ The Shopping List</Text>
+            {listTotal > 0 && (
+              <Text style={[styles.sectionTotal, settings.compactMode && styles.textSmall]}>Total: ${listTotal.toFixed(2)}</Text>
+            )}
+          </View>
+        )}
+
+        {!isSearching && Object.entries(aggregatedItems).map(([timingKey, sources]) => (
           <View key={timingKey} style={styles.timingGroup}>
             {settings.groupByFreshness && timingKey !== '_all' && (
               <Text style={[styles.timingTitle, settings.compactMode && styles.timingTitleCompact]}>{timingKey}</Text>
@@ -519,11 +541,7 @@ export default function TheRunScreen() {
           </View>
         ))}
 
-        {!hasItems && (
-          <Text style={styles.emptyText}>No items to buy for this date.</Text>
-        )}
-
-        <View style={styles.separator} />
+        {!isSearching && <View style={styles.separator} />}
 
         <View style={[styles.deliveriesHeader, settings.compactMode && styles.deliveriesHeaderCompact]}>
           <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>🚚 Deliveries & Payments</Text>
@@ -531,11 +549,12 @@ export default function TheRunScreen() {
             style={[styles.searchInput, settings.compactMode && styles.searchInputCompact]}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            onFocus={() => setIsSearching(true)}
+            onBlur={() => { if (!searchQuery) setIsSearching(false); }}
             placeholder="Search person or location..."
             placeholderTextColor="#888"
           />
         </View>
-
 
         {peopleOrders.map((group) => {
           const q = searchQuery.toLowerCase().trim();
@@ -792,7 +811,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 5,
-    paddingVertical: 5,
+    marginVertical: 15,
+  },
+  exitSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 15,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  exitSearchBtnCompact: {
+    padding: 8,
+  },
+  exitSearchText: {
+    color: '#2f95dc',
+    fontWeight: 'bold',
   },
   sourceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   sourceTitle: { fontSize: 16, color: '#aaa' },

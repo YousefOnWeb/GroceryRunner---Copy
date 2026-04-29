@@ -10,7 +10,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { and, eq, sql } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSettings } from '@/utils/settings';
 
@@ -41,6 +41,7 @@ export default function PeopleScreen() {
   const [logPerson, setLogPerson] = useState<{ id: string; name: string } | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   // Selection state
   const [selectionMode, setSelectionMode] = useState(false);
@@ -238,7 +239,21 @@ export default function PeopleScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
       <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
-        {!selectionMode ? (
+        {isSearching && (
+          <TouchableOpacity 
+            style={[styles.exitSearchBtn, settings.compactMode && styles.exitSearchBtnCompact]} 
+            onPress={() => { 
+              setIsSearching(false); 
+              setSearchQuery(''); 
+              Keyboard.dismiss();
+            }}
+          >
+            <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Search Mode</Text>
+          </TouchableOpacity>
+        )}
+
+        {!isSearching && !selectionMode && (
           <View style={[styles.headerRow, settings.compactMode && styles.headerRowCompact]}>
             <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>Balances</Text>
             <View style={styles.headerActions}>
@@ -251,7 +266,9 @@ export default function PeopleScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        ) : (
+        )}
+
+        {selectionMode && (
           <View style={[styles.headerRow, settings.compactMode && styles.headerRowCompact]}>
             <View style={styles.selectionLeft}>
               <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedPersons(new Set()); }}>
@@ -281,6 +298,8 @@ export default function PeopleScreen() {
             onChangeText={setSearchQuery}
             placeholder="Search name, place or alias..."
             placeholderTextColor="#888"
+            onFocus={() => setIsSearching(true)}
+            onBlur={() => { if (!searchQuery) setIsSearching(false); }}
           />
         </View>
 
@@ -492,6 +511,22 @@ const styles = StyleSheet.create({
   selectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   bulkDeleteBtn: { backgroundColor: '#ff4444', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   mergeBtn: { backgroundColor: '#ff9800', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  exitSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 15,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  exitSearchBtnCompact: {
+    padding: 8,
+  },
+  exitSearchText: {
+    color: '#2f95dc',
+    fontWeight: 'bold',
+  },
   
   // Compact Modifiers
   contentCompact: { padding: 8 },
