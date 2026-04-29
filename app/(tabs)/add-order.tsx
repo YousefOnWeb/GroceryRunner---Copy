@@ -5,7 +5,7 @@ import PersonModal from '@/components/PersonModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
-import { items, orderItems, orders, personAliases, persons } from '@/db/schema';
+import { items, orderItems, orders, personAliases, persons, itemAliases } from '@/db/schema';
 import { extractDateValue, formatDateLabel, getDefaultDate, getLocalDateString } from '@/utils/dates';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -19,6 +19,7 @@ export default function AddOrderScreen() {
   const { data: people } = useLiveQuery(db.select().from(persons));
   const { data: allAliases } = useLiveQuery(db.select().from(personAliases));
   const { data: catalog } = useLiveQuery(db.select().from(items));
+  const { data: itemAliasesList } = useLiveQuery(db.select().from(itemAliases));
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
   const { settings } = useSettings();
@@ -155,10 +156,10 @@ export default function AddOrderScreen() {
     }
   };
 
-  const handleCreateItemSubmit = async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', isCorrection: boolean) => {
+  const handleCreateItemSubmit = async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', isCorrection: boolean, aliases: string[]) => {
     setItemModalVisible(false);
     try {
-      const newItem = await api.addItem(name, defaultPrice, source, timing);
+      const newItem = await api.addItem(name, defaultPrice, source, timing, aliases);
       if (newItem && newItem.length > 0) {
         addToCart(newItem[0]);
         setSearchQuery('');
@@ -187,11 +188,13 @@ export default function AddOrderScreen() {
   const filteredCatalog = catalog?.filter((item) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
+    const aliases = itemAliasesList?.filter(a => a.itemId === item.id).map(a => a.alias) || [];
     const searchString = [
       item.name,
       item.defaultPrice?.toString(),
       item.source,
-      item.timing
+      item.timing,
+      ...aliases
     ].join(' ').toLowerCase();
     return searchString.includes(q);
   }) || [];

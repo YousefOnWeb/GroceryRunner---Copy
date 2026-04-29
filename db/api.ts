@@ -1,7 +1,7 @@
 import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import * as crypto from 'expo-crypto';
 import { db } from './index';
-import { items, orderItems, orders, personAliases, persons, transactions } from './schema';
+import { items, orderItems, orders, personAliases, persons, transactions, itemAliases, placeAliases, sourceAliases } from './schema';
 
 export const generateId = () => crypto.randomUUID();
 
@@ -74,6 +74,21 @@ export const api = {
     return rows.map(r => r.alias);
   },
 
+  getItemAliases: async (itemId: string): Promise<string[]> => {
+    const rows = await db.select({ alias: itemAliases.alias }).from(itemAliases).where(eq(itemAliases.itemId, itemId));
+    return rows.map(r => r.alias);
+  },
+
+  getPlaceAliases: async (placeName: string): Promise<string[]> => {
+    const rows = await db.select({ alias: placeAliases.alias }).from(placeAliases).where(eq(placeAliases.placeName, placeName));
+    return rows.map(r => r.alias);
+  },
+
+  getSourceAliases: async (sourceName: string): Promise<string[]> => {
+    const rows = await db.select({ alias: sourceAliases.alias }).from(sourceAliases).where(eq(sourceAliases.sourceName, sourceName));
+    return rows.map(r => r.alias);
+  },
+
   /** Search persons by name or alias. Returns matched persons (deduplicated). */
   searchPersons: async (query: string) => {
     const q = query.trim().toLowerCase();
@@ -117,21 +132,47 @@ export const api = {
 
     return null;
   },
+
+  resolvePlaceByNameOrAlias: async (input: string) => {
+    if (!input) return null;
+    const trimmed = input.trim();
+    const byAlias = await db.select({ placeName: placeAliases.placeName })
+      .from(placeAliases)
+      .where(sql`lower(alias) = lower(${trimmed})`);
+    if (byAlias.length > 0) return byAlias[0].placeName;
+    return trimmed;
+  },
+
+  resolveSourceByNameOrAlias: async (input: string) => {
+    if (!input) return null;
+    const trimmed = input.trim();
+    const byAlias = await db.select({ sourceName: sourceAliases.sourceName })
+      .from(sourceAliases)
+      .where(sql`lower(alias) = lower(${trimmed})`);
+    if (byAlias.length > 0) return byAlias[0].sourceName;
+    return trimmed;
+  },
   
-  addItem: async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime') => {
+  addItem: async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', aliases?: string[]) => {
     const trimmed = name.trim();
     const existing = await db.select().from(items).where(sql`lower(name) = lower(${trimmed})`);
     if (existing.length > 0) return existing;
     
-    let finalSource = source?.trim() || null;
-    if (finalSource) {
-      const existingSources = await db.select().from(items).where(sql`lower(source) = lower(${finalSource})`);
-      if (existingSources.length > 0 && existingSources[0].source) {
-        finalSource = existingSources[0].source;
+    let finalSource = source ? await api.resolveSourceByNameOrAlias(source) : null;
+
+    const result = await db.insert(items).values({ id: generateId(), name: trimmed, defaultPrice, source: finalSource, timing }).returning();
+    
+    if (aliases && aliases.length > 0) {
+      const aliasValues = aliases
+        .map(a => a.trim())
+        .filter(a => a.length > 0)
+        .map(a => ({ id: generateId(), itemId: result[0].id, alias: a }));
+      if (aliasValues.length > 0) {
+        await db.insert(itemAliases).values(aliasValues);
       }
     }
-
-    return db.insert(items).values({ id: generateId(), name: trimmed, defaultPrice, source: finalSource, timing }).returning();
+    
+    return result;
   },
   
   createOrder: async (personId: string, targetDate: string, orderLines: { itemId: string, quantity: number, unitPrice: number | null }[], deliveryPlace?: string | null) => {
@@ -151,12 +192,14 @@ export const api = {
       };
     });
 
+    let finalPlace = deliveryPlace ? await api.resolvePlaceByNameOrAlias(deliveryPlace) : null;
+
     await db.insert(orders).values({
       id: orderId,
       personId,
       targetDate,
       isPaid: false,
-      deliveryPlace: deliveryPlace?.trim() || null,
+      deliveryPlace: finalPlace,
     });
     
     if (linesToInsert.length > 0) {
@@ -250,7 +293,7 @@ export const api = {
     // Update deliveryPlace and set order to unpaid
     const orderUpdates: any = { isPaid: false };
     if (deliveryPlace !== undefined) {
-      orderUpdates.deliveryPlace = deliveryPlace?.trim() || null;
+      orderUpdates.deliveryPlace = deliveryPlace ? await api.resolvePlaceByNameOrAlias(deliveryPlace) : null;
     }
     await db.update(orders).set(orderUpdates).where(eq(orders.id, orderId));
   },
@@ -417,22 +460,33 @@ export const api = {
     return api.changeBalance(personId, amount, note);
   },
   
-  updateItem: async (id: string, updates: Partial<{ name: string; defaultPrice: number | null; source: string | null; timing: 'Fresh' | 'Anytime' }>, isCorrection: boolean = false) => {
-    let finalSource = updates.source?.trim() || null;
-    if (finalSource) {
-      const existingSources = await db.select().from(items).where(sql`lower(source) = lower(${finalSource})`);
-      if (existingSources.length > 0 && existingSources[0].source) {
-        finalSource = existingSources[0].source;
-      }
-    }
-    const finalUpdates = { ...updates, source: finalSource };
+  updateItem: async (id: string, updates: Partial<{ name: string; defaultPrice: number | null; source: string | null; timing: 'Fresh' | 'Anytime', aliases: string[] }>, isCorrection: boolean = false) => {
+    let finalSource = updates.source !== undefined ? (updates.source ? await api.resolveSourceByNameOrAlias(updates.source) : null) : undefined;
+    
+    const { aliases, ...itemUpdates } = updates;
+    const finalUpdates: any = { ...itemUpdates };
+    
+    if (finalSource !== undefined) finalUpdates.source = finalSource;
     if (updates.name) finalUpdates.name = updates.name.trim();
 
     // Fetch name for log before update
     const oldItem = await db.select({ name: items.name }).from(items).where(eq(items.id, id));
     const itemName = oldItem.length > 0 ? oldItem[0].name : 'Item';
 
-    await db.update(items).set(finalUpdates).where(eq(items.id, id));
+    if (Object.keys(finalUpdates).length > 0) {
+      await db.update(items).set(finalUpdates).where(eq(items.id, id));
+    }
+
+    if (aliases !== undefined) {
+      await db.delete(itemAliases).where(eq(itemAliases.itemId, id));
+      const aliasValues = aliases
+        .map(a => a.trim())
+        .filter(a => a.length > 0)
+        .map(a => ({ id: generateId(), itemId: id, alias: a }));
+      if (aliasValues.length > 0) {
+        await db.insert(itemAliases).values(aliasValues);
+      }
+    }
 
     if (updates.defaultPrice !== undefined) {
       const newPrice = updates.defaultPrice;
@@ -537,7 +591,13 @@ export const api = {
 
   getDistinctSources: async () => {
     const res = await db.selectDistinct({ source: items.source }).from(items);
-    return res.map(r => r.source).filter((s): s is string => s !== null && s.trim() !== '');
+    const aliasRes = await db.selectDistinct({ alias: sourceAliases.alias }).from(sourceAliases);
+    
+    const all = new Set([
+      ...res.map(r => r.source).filter((s): s is string => s !== null && s.trim() !== ''),
+      ...aliasRes.map(r => r.alias).filter((s): s is string => s !== null && s.trim() !== '')
+    ]);
+    return Array.from(all);
   },
 
   getDistinctPlaces: async (): Promise<string[]> => {
@@ -551,9 +611,14 @@ export const api = {
       .from(orders)
       .where(sql`${orders.deliveryPlace} IS NOT NULL AND ${orders.deliveryPlace} != ''`);
 
+    const aliasPlaces = await db
+      .selectDistinct({ alias: placeAliases.alias })
+      .from(placeAliases);
+
     const all = new Set([
       ...personPlaces.map(r => r.place).filter((s): s is string => s !== null),
       ...orderPlaces.map(r => r.place).filter((s): s is string => s !== null),
+      ...aliasPlaces.map(r => r.alias).filter((s): s is string => s !== null),
     ]);
     
     return Array.from(all);
@@ -569,7 +634,52 @@ export const api = {
   },
 
   deleteItem: async (id: string) => {
+    await db.delete(itemAliases).where(eq(itemAliases.itemId, id));
     await db.delete(items).where(eq(items.id, id));
+  },
+
+  updatePlace: async (oldName: string, newName: string, aliases?: string[]) => {
+    await db.update(persons).set({ typicalPlace: newName }).where(eq(persons.typicalPlace, oldName));
+    await db.update(orders).set({ deliveryPlace: newName }).where(eq(orders.deliveryPlace, oldName));
+    await db.update(placeAliases).set({ placeName: newName }).where(eq(placeAliases.placeName, oldName));
+
+    if (aliases !== undefined) {
+      await db.delete(placeAliases).where(eq(placeAliases.placeName, newName));
+      const aliasValues = aliases
+        .map(a => a.trim())
+        .filter(a => a.length > 0)
+        .map(a => ({ id: generateId(), placeName: newName, alias: a }));
+      if (aliasValues.length > 0) {
+        await db.insert(placeAliases).values(aliasValues);
+      }
+    }
+  },
+
+  updateSource: async (oldName: string, newName: string, aliases?: string[]) => {
+    await db.update(items).set({ source: newName }).where(eq(items.source, oldName));
+    await db.update(sourceAliases).set({ sourceName: newName }).where(eq(sourceAliases.sourceName, oldName));
+
+    if (aliases !== undefined) {
+      await db.delete(sourceAliases).where(eq(sourceAliases.sourceName, newName));
+      const aliasValues = aliases
+        .map(a => a.trim())
+        .filter(a => a.length > 0)
+        .map(a => ({ id: generateId(), sourceName: newName, alias: a }));
+      if (aliasValues.length > 0) {
+        await db.insert(sourceAliases).values(aliasValues);
+      }
+    }
+  },
+
+  deletePlace: async (name: string) => {
+    await db.update(persons).set({ typicalPlace: null }).where(eq(persons.typicalPlace, name));
+    await db.update(orders).set({ deliveryPlace: null }).where(eq(orders.deliveryPlace, name));
+    await db.delete(placeAliases).where(eq(placeAliases.placeName, name));
+  },
+
+  deleteSource: async (name: string) => {
+    await db.update(items).set({ source: null }).where(eq(items.source, name));
+    await db.delete(sourceAliases).where(eq(sourceAliases.sourceName, name));
   },
 
   deleteOrder: async (orderId: string) => {
@@ -629,6 +739,58 @@ export const api = {
         }
       }
     }
+  },
+
+  mergePersons: async (primaryId: string, secondaryId: string, keepSecondaryAsAlias: boolean) => {
+    await db.update(orders).set({ personId: primaryId }).where(eq(orders.personId, secondaryId));
+    await db.update(transactions).set({ personId: primaryId }).where(eq(transactions.personId, secondaryId));
+    
+    const secondaryPerson = await db.select().from(persons).where(eq(persons.id, secondaryId));
+    
+    if (secondaryPerson.length > 0) {
+      await db.update(persons).set({ balance: sql`${persons.balance} + ${secondaryPerson[0].balance}` }).where(eq(persons.id, primaryId));
+      if (keepSecondaryAsAlias) {
+        await db.insert(personAliases).values({ id: generateId(), personId: primaryId, alias: secondaryPerson[0].name });
+      }
+    }
+
+    await db.update(personAliases).set({ personId: primaryId }).where(eq(personAliases.personId, secondaryId));
+    await db.delete(persons).where(eq(persons.id, secondaryId));
+  },
+
+  mergeItems: async (primaryId: string, secondaryId: string, keepSecondaryAsAlias: boolean) => {
+    await db.update(orderItems).set({ itemId: primaryId }).where(eq(orderItems.itemId, secondaryId));
+
+    const secondaryItem = await db.select().from(items).where(eq(items.id, secondaryId));
+    if (secondaryItem.length > 0 && keepSecondaryAsAlias) {
+      await db.insert(itemAliases).values({ id: generateId(), itemId: primaryId, alias: secondaryItem[0].name });
+    }
+
+    await db.update(itemAliases).set({ itemId: primaryId }).where(eq(itemAliases.itemId, secondaryId));
+    await db.delete(items).where(eq(items.id, secondaryId));
+  },
+
+  mergePlaces: async (primaryName: string, secondaryName: string, keepSecondaryAsAlias: boolean) => {
+    await db.update(persons).set({ typicalPlace: primaryName }).where(eq(persons.typicalPlace, secondaryName));
+    await db.update(orders).set({ deliveryPlace: primaryName }).where(eq(orders.deliveryPlace, secondaryName));
+
+    if (keepSecondaryAsAlias) {
+      await db.insert(placeAliases).values({ id: generateId(), placeName: primaryName, alias: secondaryName });
+    }
+
+    await db.update(placeAliases).set({ placeName: primaryName }).where(eq(placeAliases.placeName, secondaryName));
+    await db.delete(placeAliases).where(eq(placeAliases.placeName, secondaryName)); // remove any redundant self aliases if exist
+  },
+
+  mergeSources: async (primaryName: string, secondaryName: string, keepSecondaryAsAlias: boolean) => {
+    await db.update(items).set({ source: primaryName }).where(eq(items.source, secondaryName));
+
+    if (keepSecondaryAsAlias) {
+      await db.insert(sourceAliases).values({ id: generateId(), sourceName: primaryName, alias: secondaryName });
+    }
+
+    await db.update(sourceAliases).set({ sourceName: primaryName }).where(eq(sourceAliases.sourceName, secondaryName));
+    await db.delete(sourceAliases).where(eq(sourceAliases.sourceName, secondaryName));
   },
 
   seedDummyData: async (options: { peopleCount: number, itemsCount: number, seedOrders: boolean }) => {
@@ -742,7 +904,10 @@ export const api = {
       await tx.delete(orders).where(sql`1=1`);
       await tx.delete(personAliases).where(sql`1=1`);
       await tx.delete(persons).where(sql`1=1`);
+      await tx.delete(itemAliases).where(sql`1=1`);
       await tx.delete(items).where(sql`1=1`);
+      await tx.delete(placeAliases).where(sql`1=1`);
+      await tx.delete(sourceAliases).where(sql`1=1`);
     });
   },
 };

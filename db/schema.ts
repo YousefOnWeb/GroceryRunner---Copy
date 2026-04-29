@@ -21,6 +21,25 @@ export const items = sqliteTable('items', {
   timing: text('timing', { enum: ['Fresh', 'Anytime'] }).notNull().default('Fresh'),
 });
 
+export const itemAliases = sqliteTable('itemAliases', {
+  id: text('id').primaryKey(),
+  itemId: text('itemId').notNull().references(() => items.id, { onDelete: 'cascade' }),
+  alias: text('alias').notNull(),
+});
+
+export const placeAliases = sqliteTable('placeAliases', {
+  id: text('id').primaryKey(),
+  placeName: text('placeName').notNull(),
+  alias: text('alias').notNull(),
+});
+
+export const sourceAliases = sqliteTable('sourceAliases', {
+  id: text('id').primaryKey(),
+  sourceName: text('sourceName').notNull(),
+  alias: text('alias').notNull(),
+});
+
+
 export const orders = sqliteTable('orders', {
   id: text('id').primaryKey(),
   personId: text('personId').notNull().references(() => persons.id),

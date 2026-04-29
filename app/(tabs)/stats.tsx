@@ -4,26 +4,70 @@ import { useSettings } from '@/utils/settings';
 import { Text, View } from '@/components/Themed';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { db } from '@/db';
-import { persons, items, orderItems, orders } from '@/db/schema';
+import { persons, items, orderItems, orders, itemAliases, placeAliases, sourceAliases } from '@/db/schema';
 import { api } from '@/db/api';
 import CreateItemModal from '@/components/CreateItemModal';
+import EditStringEntityModal from '@/components/EditStringEntityModal';
+import MergeModal from '@/components/MergeModal';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import SmartTextInput from '@/components/SmartTextInput';
+
+const EMPTY_ARRAY: any[] = [];
 
 export default function StatsScreen() {
   const { data: peopleList } = useLiveQuery(db.select().from(persons));
   const { data: catalog } = useLiveQuery(db.select().from(items));
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
+  
+  const { data: itemAliasesList } = useLiveQuery(db.select().from(itemAliases));
+  const { data: placeAliasesList } = useLiveQuery(db.select().from(placeAliases));
+  const { data: sourceAliasesList } = useLiveQuery(db.select().from(sourceAliases));
+
   const { settings } = useSettings();
 
-  const [editingItem, setEditingItem] = useState<any | null>(null);
-  const [itemSearch, setItemSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'Items' | 'Places' | 'Sources'>('Items');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const itemCorpus = useMemo(() => {
-    return catalog?.map(i => i.name) || [];
+  // Item Edit State
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  
+  // String Entity Edit State
+  const [editingStringEntity, setEditingStringEntity] = useState<{ type: 'Place' | 'Source', name: string } | null>(null);
+
+  // Selection & Merge State
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [mergeModalVisible, setMergeModalVisible] = useState(false);
+
+  // Derive Places and Sources
+  const places = useMemo(() => {
+    const set = new Set([
+      ...(peopleList || []).map(p => p.typicalPlace), 
+      ...(allOrders || []).map(o => o.deliveryPlace)
+    ]);
+    return Array.from(set).filter(Boolean) as string[];
+  }, [peopleList, allOrders]);
+
+  const sources = useMemo(() => {
+    const set = new Set((catalog || []).map(c => c.source));
+    return Array.from(set).filter(Boolean) as string[];
   }, [catalog]);
 
+  const editingItemAliases = useMemo(() => {
+    if (!editingItem || !itemAliasesList) return EMPTY_ARRAY;
+    return itemAliasesList.filter(a => a.itemId === editingItem.id).map(a => a.alias);
+  }, [editingItem?.id, itemAliasesList]);
+
+  const editingStringEntityAliases = useMemo(() => {
+    if (!editingStringEntity) return EMPTY_ARRAY;
+    if (editingStringEntity.type === 'Place') {
+      return placeAliasesList?.filter(a => a.placeName === editingStringEntity.name).map(a => a.alias) || EMPTY_ARRAY;
+    } else {
+      return sourceAliasesList?.filter(a => a.sourceName === editingStringEntity.name).map(a => a.alias) || EMPTY_ARRAY;
+    }
+  }, [editingStringEntity, placeAliasesList, sourceAliasesList]);
+
+  // Stats derivation
   const stats = useMemo(() => {
     if (!peopleList || !catalog || !allOrders || !allOrderItems) return null;
 
@@ -31,13 +75,8 @@ export default function StatsScreen() {
     const itemPopularity: Record<string, { name: string; qty: number }> = {};
     let totalSpent = 0;
 
-    peopleList.forEach((p) => {
-      personTotals[p.id] = { name: p.name, total: 0 };
-    });
-
-    catalog.forEach((c) => {
-      itemPopularity[c.id] = { name: c.name, qty: 0 };
-    });
+    peopleList.forEach((p) => { personTotals[p.id] = { name: p.name, total: 0 }; });
+    catalog.forEach((c) => { itemPopularity[c.id] = { name: c.name, qty: 0 }; });
 
     allOrderItems.forEach((oi) => {
       const order = allOrders.find((o) => o.id === oi.orderId);
@@ -51,36 +90,53 @@ export default function StatsScreen() {
       }
     });
 
-    const topItems = Object.values(itemPopularity)
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5);
-
-    const topSpenders = Object.values(personTotals)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
+    const topItems = Object.values(itemPopularity).sort((a, b) => b.qty - a.qty).slice(0, 5);
+    const topSpenders = Object.values(personTotals).sort((a, b) => b.total - a.total).slice(0, 5);
 
     return { totalSpent, topItems, topSpenders, totalOrders: allOrders.length };
   }, [peopleList, catalog, allOrders, allOrderItems]);
 
-  const handleEditClick = (item: any) => {
-    setEditingItem(item);
-  };
+  // --- ACTIONS ---
 
-  const handleSaveItem = async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', isCorrection: boolean) => {
+  const handleEditClick = (item: any) => { setEditingItem(item); };
+
+  const handleSaveItem = async (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', isCorrection: boolean, aliases: string[]) => {
     if (!editingItem) return;
-    await api.updateItem(editingItem.id, {
-      name,
-      defaultPrice,
-      source,
-      timing,
-    }, isCorrection);
+    await api.updateItem(editingItem.id, { name, defaultPrice, source, timing, aliases }, isCorrection);
     setEditingItem(null);
   };
 
-  const handleDeleteItem = (item: any) => {
+  const handleSaveStringEntity = async (oldName: string, newName: string, aliases: string[]) => {
+    if (!editingStringEntity) return;
+    if (editingStringEntity.type === 'Place') {
+      await api.updatePlace(oldName, newName, aliases);
+    } else {
+      await api.updateSource(oldName, newName, aliases);
+    }
+    setEditingStringEntity(null);
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      if (next.size === 0) setSelectionMode(false);
+      return next;
+    });
+  };
+
+  const handleLongPress = (id: string) => {
+    if (!selectionMode) {
+      setSelectionMode(true);
+      setSelectedIds(new Set([id]));
+    }
+  };
+
+  const handleBulkDelete = () => {
     Alert.alert(
-      'Delete Item',
-      `Are you sure you want to delete "${item.name}"? This will not delete orders containing this item, but they might show incorrect information.`,
+      `Delete Selected ${activeTab}`,
+      `Are you sure you want to delete ${selectedIds.size} ${activeTab.toLowerCase()}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -88,10 +144,16 @@ export default function StatsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await api.deleteItem(item.id);
+              for (const id of Array.from(selectedIds)) {
+                if (activeTab === 'Items') await api.deleteItem(id);
+                else if (activeTab === 'Places') await api.deletePlace(id);
+                else if (activeTab === 'Sources') await api.deleteSource(id);
+              }
+              setSelectionMode(false);
+              setSelectedIds(new Set());
             } catch (e) {
               console.error(e);
-              Alert.alert('Error', 'Failed to delete item.');
+              Alert.alert('Error', 'Failed to delete some entries.');
             }
           },
         },
@@ -99,12 +161,141 @@ export default function StatsScreen() {
     );
   };
 
+  const getMergeEntities = () => {
+    if (selectedIds.size !== 2) return { entityA: null, entityB: null };
+    const ids = Array.from(selectedIds);
+    
+    if (activeTab === 'Items') {
+      const i1 = catalog?.find(c => c.id === ids[0]);
+      const i2 = catalog?.find(c => c.id === ids[1]);
+      if (!i1 || !i2) return { entityA: null, entityB: null };
+      return {
+        entityA: { id: i1.id, name: i1.name, details: `Source: ${i1.source || 'N/A'}` },
+        entityB: { id: i2.id, name: i2.name, details: `Source: ${i2.source || 'N/A'}` }
+      };
+    } else {
+      return {
+        entityA: { id: ids[0], name: ids[0] },
+        entityB: { id: ids[1], name: ids[1] }
+      };
+    }
+  };
+
+  const handleConfirmMerge = async (primaryId: string, secondaryId: string, keepAsAlias: boolean) => {
+    if (activeTab === 'Items') await api.mergeItems(primaryId, secondaryId, keepAsAlias);
+    else if (activeTab === 'Places') await api.mergePlaces(primaryId, secondaryId, keepAsAlias);
+    else if (activeTab === 'Sources') await api.mergeSources(primaryId, secondaryId, keepAsAlias);
+    
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  // --- RENDER HELPERS ---
+
+  const renderItemCard = (item: any) => {
+    const isSelected = selectedIds.has(item.id);
+    const aliases = itemAliasesList?.filter(a => a.itemId === item.id).map(a => a.alias) || [];
+    
+    return (
+      <TouchableOpacity 
+        key={item.id} 
+        style={[styles.itemCard, settings.compactMode && styles.itemCardCompact, isSelected && styles.cardSelected]}
+        onLongPress={() => handleLongPress(item.id)}
+        onPress={() => selectionMode ? toggleSelection(item.id) : null}
+        activeOpacity={0.8}
+        disabled={!selectionMode && !isSelected && false /* meaning it's always touchable to start selection */}
+      >
+        <View style={styles.cardContentWrapper}>
+          <View style={[styles.itemHeader, settings.compactMode && styles.itemHeaderCompact]}>
+            <View>
+              <Text style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{item.name}</Text>
+              {aliases.length > 0 && <Text style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>aka: {aliases.join(', ')}</Text>}
+            </View>
+            {!selectionMode && (
+              <TouchableOpacity onPress={() => handleEditClick(item)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
+                <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={[styles.itemDetails, settings.compactMode && styles.itemDetailsCompact]}>
+            <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Price: {item.defaultPrice ? `$${item.defaultPrice}` : 'N/A'}</Text>
+            <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Source: {item.source || 'N/A'}</Text>
+            <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Timing: {item.timing}</Text>
+          </View>
+        </View>
+
+        {selectionMode && (
+          <View style={styles.checkboxContainer}>
+            <FontAwesome name={isSelected ? "check-circle" : "circle-thin"} size={24} color={isSelected ? "#2f95dc" : "#888"} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderStringEntityCard = (name: string, type: 'Place' | 'Source') => {
+    const isSelected = selectedIds.has(name);
+    let aliases: string[] = [];
+    if (type === 'Place') aliases = placeAliasesList?.filter(a => a.placeName === name).map(a => a.alias) || [];
+    else aliases = sourceAliasesList?.filter(a => a.sourceName === name).map(a => a.alias) || [];
+
+    return (
+      <TouchableOpacity 
+        key={name} 
+        style={[styles.itemCard, settings.compactMode && styles.itemCardCompact, isSelected && styles.cardSelected]}
+        onLongPress={() => handleLongPress(name)}
+        onPress={() => selectionMode ? toggleSelection(name) : null}
+        activeOpacity={0.8}
+      >
+        <View style={styles.cardContentWrapper}>
+          <View style={[styles.itemHeader, settings.compactMode && styles.itemHeaderCompact]}>
+            <View>
+              <Text style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{name}</Text>
+              {aliases.length > 0 && <Text style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>aka: {aliases.join(', ')}</Text>}
+            </View>
+            {!selectionMode && (
+              <TouchableOpacity onPress={() => setEditingStringEntity({ type, name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
+                <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {selectionMode && (
+          <View style={styles.checkboxContainer}>
+            <FontAwesome name={isSelected ? "check-circle" : "circle-thin"} size={24} color={isSelected ? "#2f95dc" : "#888"} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  // --- FILTERING ---
+
+  const filteredItems = catalog?.filter(item => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const aliases = itemAliasesList?.filter(a => a.itemId === item.id).map(a => a.alias) || [];
+    const searchString = [item.name, item.defaultPrice?.toString(), item.source, item.timing, ...aliases].join(' ').toLowerCase();
+    return searchString.includes(q);
+  }) || [];
+
+  const filteredPlaces = places.filter(place => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const aliases = placeAliasesList?.filter(a => a.placeName === place).map(a => a.alias) || [];
+    return [place, ...aliases].join(' ').toLowerCase().includes(q);
+  });
+
+  const filteredSources = sources.filter(source => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const aliases = sourceAliasesList?.filter(a => a.sourceName === source).map(a => a.alias) || [];
+    return [source, ...aliases].join(' ').toLowerCase().includes(q);
+  });
+
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
-    >
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}>
       <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
         
         {/* STATISTICS SECTION */}
@@ -128,52 +319,59 @@ export default function StatsScreen() {
 
         <View style={styles.separator} />
 
-        {/* ITEMS DICTIONARY SECTION */}
-        <View style={styles.dictionaryHeader}>
-          <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>📖 Items Dictionary</Text>
-          <SmartTextInput
-            style={[styles.dictionarySearch, settings.compactMode && styles.dictionarySearchCompact]}
-            value={itemSearch}
-            onChangeText={setItemSearch}
-            placeholder="Search name, price, source, or timing..."
-            placeholderTextColor="#888"
-            corpus={itemCorpus}
-            compactMode={settings.compactMode}
-          />
-        </View>
-        <Text style={[styles.helperText, settings.compactMode && styles.textExtraSmall]}>Update default prices, sources, and timing for your items here.</Text>
-
-        {catalog?.filter(item => {
-          const q = itemSearch.toLowerCase().trim();
-          if (!q) return true;
-          const searchString = [
-            item.name,
-            item.defaultPrice?.toString(),
-            item.source,
-            item.timing
-          ].join(' ').toLowerCase();
-          return searchString.includes(q);
-        }).map((item) => (
-          <View key={item.id} style={[styles.itemCard, settings.compactMode && styles.itemCardCompact]}>
-            <View style={[styles.itemHeader, settings.compactMode && styles.itemHeaderCompact]}>
-              <Text style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{item.name}</Text>
-              <View style={styles.actionButtons}>
-                <TouchableOpacity onPress={() => handleEditClick(item)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
-                  <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+        {/* DICTIONARY SECTION */}
+        {!selectionMode ? (
+          <View style={styles.dictionaryHeader}>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>📖 Dictionary</Text>
+            <View style={styles.tabRow}>
+              {(['Items', 'Places', 'Sources'] as const).map(tab => (
+                <TouchableOpacity 
+                  key={tab} 
+                  style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]} 
+                  onPress={() => setActiveTab(tab)}
+                >
+                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive, settings.compactMode && styles.textSmall]}>{tab}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDeleteItem(item)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
-                  <FontAwesome name="trash" size={settings.compactMode ? 14 : 18} color="#ff4444" />
-                </TouchableOpacity>
-              </View>
-            </View>
-            
-            <View style={[styles.itemDetails, settings.compactMode && styles.itemDetailsCompact]}>
-              <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Price: {item.defaultPrice ? `$${item.defaultPrice}` : 'Not known yet'}</Text>
-              <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Source: {item.source || 'Not known yet'}</Text>
-              <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Timing: {item.timing}</Text>
+              ))}
             </View>
           </View>
-        ))}
+        ) : (
+          <View style={[styles.selectionHeader, settings.compactMode && styles.selectionHeaderCompact]}>
+            <View style={styles.selectionLeft}>
+              <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedIds(new Set()); }}>
+                <FontAwesome name="times" size={settings.compactMode ? 20 : 24} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.selectionTitle}>{selectedIds.size} Selected</Text>
+            </View>
+            <View style={styles.headerActions}>
+              {selectedIds.size === 2 && (
+                <TouchableOpacity style={[styles.mergeBtn, settings.compactMode && styles.compactBtn]} onPress={() => setMergeModalVisible(true)}>
+                  <FontAwesome name="compress" size={settings.compactMode ? 14 : 16} color="#fff" />
+                  <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Merge</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={[styles.bulkDeleteBtn, settings.compactMode && styles.compactBtn]} onPress={handleBulkDelete}>
+                <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#fff" />
+                <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        <TextInput
+          style={[styles.dictionarySearch, settings.compactMode && styles.dictionarySearchCompact]}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={`Search ${activeTab.toLowerCase()}...`}
+          placeholderTextColor="#888"
+        />
+        <Text style={[styles.helperText, settings.compactMode && styles.textExtraSmall]}>
+          Long press any item to select, merge, or bulk delete.
+        </Text>
+
+        {activeTab === 'Items' && filteredItems.map(renderItemCard)}
+        {activeTab === 'Places' && filteredPlaces.map(p => renderStringEntityCard(p, 'Place'))}
+        {activeTab === 'Sources' && filteredSources.map(s => renderStringEntityCard(s, 'Source'))}
 
       </ScrollView>
 
@@ -186,8 +384,31 @@ export default function StatsScreen() {
           initialPrice={editingItem.defaultPrice}
           initialSource={editingItem.source}
           initialTiming={editingItem.timing}
+          initialAliases={editingItemAliases}
           onCancel={() => setEditingItem(null)}
           onSubmit={handleSaveItem}
+        />
+      )}
+
+      {editingStringEntity && (
+        <EditStringEntityModal
+          visible={!!editingStringEntity}
+          entityType={editingStringEntity.type}
+          initialName={editingStringEntity.name}
+          initialAliases={editingStringEntityAliases}
+          onClose={() => setEditingStringEntity(null)}
+          onSubmit={handleSaveStringEntity}
+        />
+      )}
+
+      {mergeModalVisible && (
+        <MergeModal
+          visible={mergeModalVisible}
+          entityType={activeTab === 'Items' ? 'Item' : activeTab === 'Places' ? 'Place' : 'Source'}
+          entityA={getMergeEntities().entityA}
+          entityB={getMergeEntities().entityB}
+          onClose={() => setMergeModalVisible(false)}
+          onConfirm={handleConfirmMerge}
         />
       )}
     </KeyboardAvoidingView>
@@ -205,26 +426,34 @@ const styles = StyleSheet.create({
   listItem: { color: '#ddd', fontSize: 15, marginLeft: 10, marginBottom: 5 },
   separator: { height: 1, backgroundColor: '#555', marginVertical: 20 },
   helperText: { color: '#888', marginBottom: 15 },
-  itemCard: { backgroundColor: '#222', padding: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#444' },
-  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  
+  dictionaryHeader: { marginBottom: 10 },
+  tabRow: { flexDirection: 'row', backgroundColor: '#222', borderRadius: 8, padding: 4, marginBottom: 10 },
+  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },
+  tabBtnActive: { backgroundColor: '#333' },
+  tabText: { color: '#888', fontWeight: 'bold', fontSize: 16 },
+  tabTextActive: { color: '#2f95dc' },
+  
+  selectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, backgroundColor: '#333', padding: 15, borderRadius: 10 },
+  selectionLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  selectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  headerActions: { flexDirection: 'row', gap: 10 },
+  bulkDeleteBtn: { backgroundColor: '#ff4444', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  mergeBtn: { backgroundColor: '#ff9800', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  addBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+
+  dictionarySearch: { backgroundColor: '#333', color: '#fff', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, fontSize: 16, width: '100%', marginBottom: 5 },
+  
+  itemCard: { backgroundColor: '#222', padding: 15, borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardSelected: { borderColor: '#2f95dc', borderWidth: 2, backgroundColor: 'rgba(47, 149, 220, 0.1)' },
+  cardContentWrapper: { flex: 1 },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 },
   itemName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  actionButtons: { flexDirection: 'row', gap: 15 },
+  aliasesText: { fontSize: 12, color: '#aaa', marginTop: 2 },
   iconBtn: { padding: 5 },
-  dictionaryHeader: {
-    marginBottom: 10,
-    gap: 10,
-  },
-  dictionarySearch: {
-    backgroundColor: '#333',
-    color: '#fff',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    fontSize: 16,
-    width: '100%',
-  },
   itemDetails: { gap: 5 },
   detailText: { color: '#ccc' },
+  checkboxContainer: { paddingLeft: 15 },
   
   // Compact Modifiers
   contentCompact: { padding: 8 },
@@ -232,12 +461,14 @@ const styles = StyleSheet.create({
   statsCardCompact: { padding: 10, marginBottom: 15 },
   highlightCompact: { fontSize: 16 },
   subTitleCompact: { fontSize: 16, marginTop: 10, marginBottom: 5 },
-  dictionarySearchCompact: { paddingVertical: 4, fontSize: 12 },
-  itemCardCompact: { padding: 10, marginBottom: 10 },
-  itemHeaderCompact: { marginBottom: 5 },
+  dictionarySearchCompact: { paddingVertical: 6, fontSize: 14 },
+  itemCardCompact: { padding: 10, marginBottom: 8 },
+  itemHeaderCompact: { marginBottom: 3 },
   itemNameCompact: { fontSize: 16 },
   itemDetailsCompact: { gap: 2 },
   textSmall: { fontSize: 13 },
   textExtraSmall: { fontSize: 11 },
   paddingSmall: { padding: 2 },
+  selectionHeaderCompact: { padding: 10 },
+  compactBtn: { paddingVertical: 6, paddingHorizontal: 10 },
 });

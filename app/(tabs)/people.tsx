@@ -1,4 +1,5 @@
 import PersonModal from '@/components/PersonModal';
+import MergeModal from '@/components/MergeModal';
 import UnknownPriceModal from '@/components/UnknownPriceModal';
 import CreditLogModal from '@/components/CreditLogModal';
 import { Text, View } from '@/components/Themed';
@@ -40,6 +41,13 @@ export default function PeopleScreen() {
   const [logPerson, setLogPerson] = useState<{ id: string; name: string } | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedPersons, setSelectedPersons] = useState<Set<string>>(new Set());
+
+  // Merge modal state
+  const [mergeModalVisible, setMergeModalVisible] = useState(false);
 
   const filteredPeople = useMemo(() => {
     if (!peopleList) return [];
@@ -161,6 +169,68 @@ export default function PeopleScreen() {
     Alert.alert('Copied!', 'Balance summary copied to clipboard.');
   };
 
+  const toggleSelection = (id: string) => {
+    setSelectedPersons(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      if (next.size === 0) setSelectionMode(false);
+      return next;
+    });
+  };
+
+  const handleLongPress = (id: string) => {
+    if (!selectionMode) {
+      setSelectionMode(true);
+      setSelectedPersons(new Set([id]));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    Alert.alert(
+      'Delete Selected People',
+      `Are you sure you want to delete ${selectedPersons.size} people? This will permanently delete all their order history and balance logs.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              for (const id of Array.from(selectedPersons)) {
+                await api.deletePerson(id);
+              }
+              setSelectionMode(false);
+              setSelectedPersons(new Set());
+            } catch (e) {
+              console.error(e);
+              Alert.alert('Error', 'Failed to delete some people.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getMergeEntities = () => {
+    if (selectedPersons.size !== 2 || !peopleList) return { entityA: null, entityB: null };
+    const ids = Array.from(selectedPersons);
+    const p1 = peopleList.find(p => p.id === ids[0]);
+    const p2 = peopleList.find(p => p.id === ids[1]);
+    if (!p1 || !p2) return { entityA: null, entityB: null };
+    
+    return {
+      entityA: { id: p1.id, name: p1.name, details: `Balance: $${p1.balance.toFixed(2)}` },
+      entityB: { id: p2.id, name: p2.name, details: `Balance: $${p2.balance.toFixed(2)}` }
+    };
+  };
+
+  const handleConfirmMerge = async (primaryId: string, secondaryId: string, keepAsAlias: boolean) => {
+    await api.mergePersons(primaryId, secondaryId, keepAsAlias);
+    setSelectionMode(false);
+    setSelectedPersons(new Set());
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
@@ -168,18 +238,41 @@ export default function PeopleScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
       <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
-        <View style={[styles.headerRow, settings.compactMode && styles.headerRowCompact]}>
-          <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>Balances</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity onPress={handleCopyPeople} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
-              <FontAwesome name="copy" size={settings.compactMode ? 16 : 20} color="#2f95dc" />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.addBtn, settings.compactMode && styles.addBtnCompact]} onPress={() => setCreateModalVisible(true)}>
-              <FontAwesome name="plus" size={settings.compactMode ? 12 : 16} color="#fff" />
-              <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Add Person</Text>
-            </TouchableOpacity>
+        {!selectionMode ? (
+          <View style={[styles.headerRow, settings.compactMode && styles.headerRowCompact]}>
+            <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>Balances</Text>
+            <View style={styles.headerActions}>
+              <TouchableOpacity onPress={handleCopyPeople} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
+                <FontAwesome name="copy" size={settings.compactMode ? 16 : 20} color="#2f95dc" />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.addBtn, settings.compactMode && styles.addBtnCompact]} onPress={() => setCreateModalVisible(true)}>
+                <FontAwesome name="plus" size={settings.compactMode ? 12 : 16} color="#fff" />
+                <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Add Person</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={[styles.headerRow, settings.compactMode && styles.headerRowCompact]}>
+            <View style={styles.selectionLeft}>
+              <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedPersons(new Set()); }}>
+                <FontAwesome name="times" size={settings.compactMode ? 20 : 24} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.selectionTitle}>{selectedPersons.size} Selected</Text>
+            </View>
+            <View style={styles.headerActions}>
+              {selectedPersons.size === 2 && (
+                <TouchableOpacity style={[styles.mergeBtn, settings.compactMode && styles.compactBtn]} onPress={() => setMergeModalVisible(true)}>
+                  <FontAwesome name="compress" size={settings.compactMode ? 14 : 16} color="#fff" />
+                  <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Merge</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={[styles.bulkDeleteBtn, settings.compactMode && styles.compactBtn]} onPress={handleBulkDelete}>
+                <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#fff" />
+                <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         <View style={styles.searchContainer}>
           <TextInput
@@ -193,8 +286,21 @@ export default function PeopleScreen() {
 
         {filteredPeople.map((person) => {
           const aliases = getAliasesForPerson(person.id);
+          const isSelected = selectedPersons.has(person.id);
           return (
-            <View key={person.id} style={[styles.card, settings.compactMode && styles.cardCompact]}>
+            <TouchableOpacity 
+              key={person.id} 
+              style={[
+                styles.card, 
+                settings.compactMode && styles.cardCompact,
+                isSelected && styles.cardSelected
+              ]}
+              onLongPress={() => handleLongPress(person.id)}
+              onPress={() => {
+                if (selectionMode) toggleSelection(person.id);
+              }}
+              activeOpacity={0.8}
+            >
               <View style={styles.info}>
                 <View style={[styles.nameRow, settings.compactMode && styles.nameRowCompact]}>
                   <Text style={[styles.name, settings.compactMode && styles.nameCompact]}>{person.name}</Text>
@@ -202,9 +308,11 @@ export default function PeopleScreen() {
                     <TouchableOpacity onPress={() => setLogPerson({ id: person.id, name: person.name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
                       <FontAwesome name="history" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleEditPress(person)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
-                      <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
-                    </TouchableOpacity>
+                    {!selectionMode && (
+                      <TouchableOpacity onPress={() => handleEditPress(person)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
+                        <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
                 {person.typicalPlace ? (
@@ -228,7 +336,17 @@ export default function PeopleScreen() {
                   )}
                 </View>
               </View>
-            </View>
+
+              {selectionMode && (
+                <View style={styles.checkboxContainer}>
+                  <FontAwesome 
+                    name={isSelected ? "check-circle" : "circle-thin"} 
+                    size={24} 
+                    color={isSelected ? "#2f95dc" : "#888"} 
+                  />
+                </View>
+              )}
+            </TouchableOpacity>
           );
         })}
 
@@ -285,6 +403,16 @@ export default function PeopleScreen() {
           onClose={() => setLogPerson(null)}
         />
       )}
+      {mergeModalVisible && (
+        <MergeModal
+          visible={mergeModalVisible}
+          entityType="Person"
+          entityA={getMergeEntities().entityA}
+          entityB={getMergeEntities().entityB}
+          onClose={() => setMergeModalVisible(false)}
+          onConfirm={handleConfirmMerge}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -316,6 +444,14 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardSelected: {
+    borderColor: '#2f95dc',
+    borderWidth: 2,
+    backgroundColor: 'rgba(47, 149, 220, 0.1)',
   },
   info: { flex: 1 },
   nameRow: {
@@ -351,12 +487,18 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   emptyText: { color: '#888', fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
+  checkboxContainer: { padding: 10 },
+  selectionLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  selectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  bulkDeleteBtn: { backgroundColor: '#ff4444', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  mergeBtn: { backgroundColor: '#ff9800', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   
   // Compact Modifiers
   contentCompact: { padding: 8 },
   headerRowCompact: { marginBottom: 12 },
   titleCompact: { fontSize: 20 },
   addBtnCompact: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  compactBtn: { paddingVertical: 6, paddingHorizontal: 10 },
   cardCompact: { padding: 10, marginBottom: 8 },
   nameRowCompact: { marginBottom: 2 },
   nameCompact: { fontSize: 16 },

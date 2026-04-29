@@ -9,6 +9,9 @@ import SmartTextInput from './SmartTextInput';
 import { COMMON_GROCERY_CORPUS } from '@/utils/textMatching';
 import { db } from '@/db';
 import { items } from '@/db/schema';
+import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+
+const EMPTY_ARRAY: any[] = [];
 
 interface CreateItemModalProps {
   visible: boolean;
@@ -18,8 +21,9 @@ interface CreateItemModalProps {
   initialPrice?: number | null;
   initialSource?: string | null;
   initialTiming?: 'Fresh' | 'Anytime';
+  initialAliases?: string[];
   onCancel: () => void;
-  onSubmit: (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', isCorrection: boolean) => void;
+  onSubmit: (name: string, defaultPrice: number | null, source: string | null, timing: 'Fresh' | 'Anytime', isCorrection: boolean, aliases: string[]) => void;
 }
 
 export default function CreateItemModal({
@@ -30,6 +34,7 @@ export default function CreateItemModal({
   initialPrice = null,
   initialSource = '',
   initialTiming = 'Fresh',
+  initialAliases = EMPTY_ARRAY,
   onCancel,
   onSubmit,
 }: CreateItemModalProps) {
@@ -40,6 +45,8 @@ export default function CreateItemModal({
   const [showSourceSuggestions, setShowSourceSuggestions] = useState(false);
   const [distinctSources, setDistinctSources] = useState<string[]>([]);
   const [timing, setTiming] = useState<'Fresh' | 'Anytime'>(initialTiming);
+  const [aliases, setAliases] = useState<string[]>(initialAliases);
+  const [newAlias, setNewAlias] = useState('');
   const [isCorrection, setIsCorrection] = useState(false);
   const [itemCorpus, setItemCorpus] = useState<string[]>(COMMON_GROCERY_CORPUS);
   const { settings } = useSettings();
@@ -53,10 +60,12 @@ export default function CreateItemModal({
       setShowSourceSuggestions(false);
       loadDistinctSources();
       setTiming(initialTiming);
+      setAliases([...initialAliases]);
+      setNewAlias('');
       setIsCorrection(false);
       loadCorpus();
     }
-  }, [visible, initialName, initialPrice, initialSource, initialTiming]);
+  }, [visible, initialName, initialPrice, initialSource, initialTiming, initialAliases]);
 
   const loadCorpus = async () => {
     try {
@@ -87,6 +96,19 @@ export default function CreateItemModal({
     setShowSourceSuggestions(false);
   };
 
+  const addAlias = () => {
+    const trimmed = newAlias.trim();
+    if (!trimmed) return;
+    if (aliases.some(a => a.toLowerCase() === trimmed.toLowerCase())) return;
+    if (trimmed.toLowerCase() === name.toLowerCase()) return;
+    setAliases(prev => [...prev, trimmed]);
+    setNewAlias('');
+  };
+
+  const removeAlias = (index: number) => {
+    setAliases(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = () => {
     const price = parseFloat(priceStr);
     const finalSource = (sourceSearch.trim() || source.trim()) || null;
@@ -95,7 +117,8 @@ export default function CreateItemModal({
       isNaN(price) ? null : price,
       finalSource,
       timing,
-      isCorrection
+      isCorrection,
+      aliases
     );
   };
 
@@ -160,6 +183,38 @@ export default function CreateItemModal({
               ))}
             </View>
           )}
+
+          <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Aliases / Nicknames</Text>
+          <Text style={styles.hint}>Help recognition when typing different names.</Text>
+          
+          <View style={styles.aliasList}>
+            {aliases.map((alias, idx) => (
+              <View key={idx} style={styles.aliasRow}>
+                <Text style={styles.aliasText}>{alias}</Text>
+                <TouchableOpacity onPress={() => removeAlias(idx)} style={styles.removeAliasBtn}>
+                  <FontAwesome name="times-circle" size={18} color="#ff4444" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.addAliasRow}>
+            <TextInput
+              style={[styles.input, { flex: 1, marginBottom: 0 }]}
+              value={newAlias}
+              onChangeText={setNewAlias}
+              placeholder="Add a nickname..."
+              placeholderTextColor="#888"
+              onSubmitEditing={addAlias}
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              style={[styles.addAliasBtn, !newAlias.trim() && { opacity: 0.4 }]}
+              onPress={addAlias}
+              disabled={!newAlias.trim()}>
+              <FontAwesome name="plus" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
 
           <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Timing</Text>
           <View style={[styles.dropdownContainer, settings.compactMode && styles.dropdownContainerCompact]}>
@@ -251,6 +306,12 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     marginTop: 10,
   },
+  hint: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
   input: {
     backgroundColor: '#333',
     color: '#fff',
@@ -279,6 +340,37 @@ const styles = StyleSheet.create({
   dropdownContainer: {
     marginBottom: 10,
     zIndex: 10,
+  },
+  aliasList: {
+    marginBottom: 5,
+  },
+  aliasRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#333',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 5,
+  },
+  aliasText: {
+    color: '#fff',
+    fontSize: 15,
+  },
+  removeAliasBtn: {
+    padding: 4,
+  },
+  addAliasRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  addAliasBtn: {
+    backgroundColor: '#2f95dc',
+    padding: 12,
+    borderRadius: 8,
   },
   buttonRow: {
     flexDirection: 'row',
