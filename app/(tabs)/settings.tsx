@@ -6,6 +6,9 @@ import React, { useEffect, useState } from 'react';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Alert } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 
 const SHOW_DEV_SECTION = true; // Toggle this manually to show/hide the dev section
 
@@ -16,6 +19,9 @@ export default function SettingsScreen() {
   
   const [activeModal, setActiveModal] = useState<'locations' | 'sources' | 'seed' | null>(null);
   const [seedOptions, setSeedOptions] = useState({ peopleCount: 5, itemsCount: 10, seedOrders: true });
+  const [importStrategy, setImportStrategy] = useState<'replace' | 'skip'>('skip');
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const refreshPreviews = async () => {
     const distinctPlaces = await api.getDistinctPlaces();
@@ -36,6 +42,53 @@ export default function SettingsScreen() {
   useEffect(() => {
     refreshPreviews();
   }, [settings.locationOrder, settings.sourceOrder, activeModal]);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const data = await api.getAllData();
+      const fileName = `GroceryRunner_Export_${new Date().toISOString().split('T')[0]}.json`;
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(data), { encoding: FileSystem.EncodingType.UTF8 });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        Alert.alert('Sharing not available', 'The file was saved locally but cannot be shared.');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Export Failed', 'An error occurred while generating the export file.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) return;
+
+      const fileContent = await FileSystem.readAsStringAsync(result.assets[0].uri);
+      const importObj = JSON.parse(fileContent);
+
+      setIsImporting(true);
+      await api.importData(importObj, importStrategy);
+      
+      await refreshPreviews();
+      Alert.alert('Import Successful', 'Your data has been merged successfully.');
+    } catch (e: any) {
+      console.error(e);
+      Alert.alert('Import Failed', e.message || 'An error occurred while importing the file.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<string>) => {
     return (
@@ -146,6 +199,67 @@ export default function SettingsScreen() {
             trackColor={{ false: '#555', true: '#2f95dc' }}
             thumbColor={settings.groupByFreshness ? '#fff' : '#ccc'}
           />
+        </View>
+
+        <View style={styles.separator} />
+
+        {/* Data Management */}
+        <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>Data Management</Text>
+        
+        <View style={[styles.sectionCard, settings.compactMode && styles.cardCompact, { marginTop: 10 }]}>
+          <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Export Data</Text>
+          <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall, { marginBottom: 15 }]}>
+            Save all your persons, items, and orders to a file. You can use this file to move your data to another device or keep a backup.
+          </Text>
+          <TouchableOpacity 
+            style={[styles.actionButton, isExporting && { opacity: 0.7 }, settings.compactMode && styles.btnCompact]} 
+            onPress={handleExport}
+            disabled={isExporting}
+          >
+            <FontAwesome name="upload" size={settings.compactMode ? 14 : 16} color="#fff" />
+            <Text style={[styles.actionButtonText, settings.compactMode && styles.textSmall]}>
+              {isExporting ? 'Exporting...' : 'Export to File'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.sectionCard, settings.compactMode && styles.cardCompact]}>
+          <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Import Data</Text>
+          <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall, { marginBottom: 15 }]}>
+            Load data from a previously exported file. New data will be merged with your current data.
+          </Text>
+          
+          <View style={styles.strategyRow}>
+            <Text style={[styles.strategyLabel, settings.compactMode && styles.textExtraSmall]}>Conflict Policy:</Text>
+            <TouchableOpacity 
+              style={[styles.strategyToggle, importStrategy === 'skip' && styles.strategyActive]} 
+              onPress={() => setImportStrategy('skip')}
+            >
+              <Text style={[styles.strategyText, importStrategy === 'skip' && styles.strategyTextActive]}>Skip Duplicates</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.strategyToggle, importStrategy === 'replace' && styles.strategyActiveReplace]} 
+              onPress={() => setImportStrategy('replace')}
+            >
+              <Text style={[styles.strategyText, importStrategy === 'replace' && styles.strategyTextActive]}>Replace Existing</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.strategyHint, settings.compactMode && styles.textExtraSmall]}>
+            {importStrategy === 'skip' 
+              ? 'If an item or person already exists, it will be skipped.' 
+              : 'If an item or person already exists, its details will be updated with the file data.'}
+          </Text>
+
+          <TouchableOpacity 
+            style={[styles.actionButton, { backgroundColor: '#444' }, isImporting && { opacity: 0.7 }, settings.compactMode && styles.btnCompact]} 
+            onPress={handleImport}
+            disabled={isImporting}
+          >
+            <FontAwesome name="download" size={settings.compactMode ? 14 : 16} color="#fff" />
+            <Text style={[styles.actionButtonText, settings.compactMode && styles.textSmall]}>
+              {isImporting ? 'Importing...' : 'Import from File'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {SHOW_DEV_SECTION && (
@@ -440,4 +554,59 @@ const styles = StyleSheet.create({
   numberText: { color: '#fff', fontSize: 18, fontWeight: 'bold', minWidth: 30, textAlign: 'center' },
   seedConfirmBtn: { backgroundColor: '#2f95dc', padding: 15, borderRadius: 12, alignItems: 'center' },
   seedConfirmText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  actionButton: {
+    backgroundColor: '#28a745',
+    padding: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  strategyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  strategyLabel: {
+    color: '#aaa',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  strategyToggle: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#333',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  strategyActive: {
+    backgroundColor: '#2f95dc',
+    borderColor: '#2f95dc',
+  },
+  strategyActiveReplace: {
+    backgroundColor: '#ff9800',
+    borderColor: '#ff9800',
+  },
+  strategyText: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  strategyTextActive: {
+    color: '#fff',
+  },
+  strategyHint: {
+    fontSize: 11,
+    color: '#666',
+    fontStyle: 'italic',
+    marginBottom: 15,
+  },
 });

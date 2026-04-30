@@ -4,6 +4,7 @@ import { db } from './index';
 import { items, orderItems, orders, personAliases, persons, transactions, itemAliases, placeAliases, sourceAliases } from './schema';
 
 export const generateId = () => crypto.randomUUID();
+export const CURRENT_SCHEMA_VERSION = 1;
 
 export const api = {
   addPerson: async (name: string, typicalPlace?: string | null, aliases?: string[]) => {
@@ -622,6 +623,201 @@ export const api = {
     ]);
     
     return Array.from(all);
+  },
+
+  getAllData: async () => {
+    return {
+      version: CURRENT_SCHEMA_VERSION,
+      timestamp: new Date().toISOString(),
+      data: {
+        persons: await db.select().from(persons),
+        personAliases: await db.select().from(personAliases),
+        items: await db.select().from(items),
+        itemAliases: await db.select().from(itemAliases),
+        orders: await db.select().from(orders),
+        orderItems: await db.select().from(orderItems),
+        transactions: await db.select().from(transactions),
+        placeAliases: await db.select().from(placeAliases),
+        sourceAliases: await db.select().from(sourceAliases),
+      }
+    };
+  },
+
+  importData: async (importObj: any, strategy: 'replace' | 'skip') => {
+    if (!importObj || importObj.version === undefined) {
+      throw new Error('Invalid export file format.');
+    }
+    if (importObj.version > CURRENT_SCHEMA_VERSION) {
+      throw new Error('Export file is from a newer version of the app. Please update the app.');
+    }
+
+    const { data } = importObj;
+    
+    // --- 1. IMPORT PERSONS ---
+    const personIdMap: Record<string, string> = {}; // Old ID -> New/Existing ID
+    for (const p of (data.persons || [])) {
+      const existing = await db.select().from(persons).where(sql`lower(name) = lower(${p.name})`);
+      if (existing.length > 0) {
+        personIdMap[p.id] = existing[0].id;
+        if (strategy === 'replace') {
+          await db.update(persons).set({
+            typicalPlace: p.typicalPlace,
+            balance: p.balance
+          }).where(eq(persons.id, existing[0].id));
+        }
+      } else {
+        const newId = generateId();
+        await db.insert(persons).values({
+          id: newId,
+          name: p.name,
+          typicalPlace: p.typicalPlace,
+          balance: p.balance
+        });
+        personIdMap[p.id] = newId;
+      }
+    }
+
+    // --- 2. IMPORT ITEMS ---
+    const itemIdMap: Record<string, string> = {}; // Old ID -> New/Existing ID
+    for (const i of (data.items || [])) {
+      const existing = await db.select().from(items).where(sql`lower(name) = lower(${i.name})`);
+      if (existing.length > 0) {
+        itemIdMap[i.id] = existing[0].id;
+        if (strategy === 'replace') {
+          await db.update(items).set({
+            defaultPrice: i.defaultPrice,
+            source: i.source,
+            timing: i.timing
+          }).where(eq(items.id, existing[0].id));
+        }
+      } else {
+        const newId = generateId();
+        await db.insert(items).values({
+          id: newId,
+          name: i.name,
+          defaultPrice: i.defaultPrice,
+          source: i.source,
+          timing: i.timing
+        });
+        itemIdMap[i.id] = newId;
+      }
+    }
+
+    // --- 3. IMPORT ALIASES ---
+    if (data.personAliases) {
+      for (const pa of data.personAliases) {
+        const newPersonId = personIdMap[pa.personId];
+        if (!newPersonId) continue;
+        const existing = await db.select().from(personAliases).where(and(eq(personAliases.personId, newPersonId), sql`lower(alias) = lower(${pa.alias})`));
+        if (existing.length === 0) {
+          await db.insert(personAliases).values({ id: generateId(), personId: newPersonId, alias: pa.alias });
+        }
+      }
+    }
+    if (data.itemAliases) {
+      for (const ia of data.itemAliases) {
+        const newItemId = itemIdMap[ia.itemId];
+        if (!newItemId) continue;
+        const existing = await db.select().from(itemAliases).where(and(eq(itemAliases.itemId, newItemId), sql`lower(alias) = lower(${ia.alias})`));
+        if (existing.length === 0) {
+          await db.insert(itemAliases).values({ id: generateId(), itemId: newItemId, alias: ia.alias });
+        }
+      }
+    }
+    if (data.placeAliases) {
+      for (const pla of data.placeAliases) {
+        const existing = await db.select().from(placeAliases).where(and(eq(placeAliases.placeName, pla.placeName), sql`lower(alias) = lower(${pla.alias})`));
+        if (existing.length === 0) {
+          await db.insert(placeAliases).values({ id: generateId(), placeName: pla.placeName, alias: pla.alias });
+        }
+      }
+    }
+    if (data.sourceAliases) {
+      for (const sa of data.sourceAliases) {
+        const existing = await db.select().from(sourceAliases).where(and(eq(sourceAliases.sourceName, sa.sourceName), sql`lower(alias) = lower(${sa.alias})`));
+        if (existing.length === 0) {
+          await db.insert(sourceAliases).values({ id: generateId(), sourceName: sa.sourceName, alias: sa.alias });
+        }
+      }
+    }
+
+    // --- 4. IMPORT ORDERS ---
+    for (const o of (data.orders || [])) {
+      const newPersonId = personIdMap[o.personId];
+      if (!newPersonId) continue;
+      
+      const existing = await db.select().from(orders).where(and(eq(orders.personId, newPersonId), eq(orders.targetDate, o.targetDate)));
+      if (existing.length > 0) {
+        if (strategy === 'replace') {
+          await db.delete(orderItems).where(eq(orderItems.orderId, existing[0].id));
+          await db.update(orders).set({
+            deliveryPlace: o.deliveryPlace,
+            isPaid: o.isPaid
+          }).where(eq(orders.id, existing[0].id));
+          
+          const itemsForThisOrder = (data.orderItems || []).filter((oi: any) => oi.orderId === o.id);
+          for (const oi of itemsForThisOrder) {
+            const newItemId = itemIdMap[oi.itemId];
+            if (!newItemId) continue;
+            await db.insert(orderItems).values({
+              id: generateId(),
+              orderId: existing[0].id,
+              itemId: newItemId,
+              quantity: oi.quantity,
+              unitPrice: oi.unitPrice,
+              isPaid: oi.isPaid
+            });
+          }
+        }
+      } else {
+        const newOrderId = generateId();
+        await db.insert(orders).values({
+          id: newOrderId,
+          personId: newPersonId,
+          targetDate: o.targetDate,
+          deliveryPlace: o.deliveryPlace,
+          isPaid: o.isPaid
+        });
+        
+        const itemsForThisOrder = (data.orderItems || []).filter((oi: any) => oi.orderId === o.id);
+        for (const oi of itemsForThisOrder) {
+          const newItemId = itemIdMap[oi.itemId];
+          if (!newItemId) continue;
+          await db.insert(orderItems).values({
+            id: generateId(),
+            orderId: newOrderId,
+            itemId: newItemId,
+            quantity: oi.quantity,
+            unitPrice: oi.unitPrice,
+            isPaid: oi.isPaid
+          });
+        }
+      }
+    }
+
+    // --- 5. IMPORT TRANSACTIONS ---
+    for (const t of (data.transactions || [])) {
+      const newPersonId = personIdMap[t.personId];
+      if (!newPersonId) continue;
+      
+      const existing = await db.select().from(transactions).where(and(
+        eq(transactions.personId, newPersonId),
+        eq(transactions.amount, t.amount),
+        eq(transactions.date, t.date),
+        eq(transactions.type, t.type)
+      ));
+      
+      if (existing.length === 0) {
+        await db.insert(transactions).values({
+          id: generateId(),
+          personId: newPersonId,
+          amount: t.amount,
+          date: t.date,
+          type: t.type,
+          note: t.note
+        });
+      }
+    }
   },
 
   deletePerson: async (id: string) => {
