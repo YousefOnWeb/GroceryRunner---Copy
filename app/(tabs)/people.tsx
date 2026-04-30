@@ -50,12 +50,34 @@ export default function PeopleScreen() {
   // Merge modal state
   const [mergeModalVisible, setMergeModalVisible] = useState(false);
 
-  const filteredPeople = useMemo(() => {
-    if (!peopleList) return [];
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return peopleList;
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'none' | 'lexical' | 'balance' | 'date'>('none');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-    return peopleList.filter(p => {
+  const sortedPeople = useMemo(() => {
+    if (!peopleList) return [];
+    let list = [...peopleList];
+    
+    if (sortBy === 'lexical') {
+      list.sort((a, b) => sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+    } else if (sortBy === 'balance') {
+      list.sort((a, b) => sortOrder === 'asc' ? a.balance - b.balance : b.balance - a.balance);
+    } else if (sortBy === 'date') {
+      // @ts-ignore - createdAt might be missing on very old entries but we added it
+      list.sort((a, b) => {
+        const da = a.createdAt || '';
+        const db = b.createdAt || '';
+        return sortOrder === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
+      });
+    }
+    return list;
+  }, [peopleList, sortBy, sortOrder]);
+
+  const filteredPeople = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return sortedPeople;
+
+    return sortedPeople.filter(p => {
       const aliases = allAliases?.filter(a => a.personId === p.id).map(a => a.alias) || [];
       const searchString = [
         p.name,
@@ -64,7 +86,7 @@ export default function PeopleScreen() {
       ].join(' ').toLowerCase();
       return searchString.includes(q);
     });
-  }, [peopleList, allAliases, searchQuery]);
+  }, [sortedPeople, allAliases, searchQuery]);
 
   const { data: unpaidUnknownPriceItems } = useLiveQuery(
     db.select({ personId: orders.personId })
@@ -232,6 +254,16 @@ export default function PeopleScreen() {
     setSelectedPersons(new Set());
   };
 
+  const toggleSort = (type: typeof sortBy) => {
+    if (sortBy === type) {
+      if (sortOrder === 'asc') setSortOrder('desc');
+      else setSortBy('none');
+    } else {
+      setSortBy(type);
+      setSortOrder('asc');
+    }
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
@@ -291,7 +323,7 @@ export default function PeopleScreen() {
           </View>
         )}
 
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, settings.compactMode && styles.searchContainerCompact]}>
           <TextInput
             style={[styles.searchInput, settings.compactMode && styles.searchInputCompact]}
             value={searchQuery}
@@ -302,6 +334,71 @@ export default function PeopleScreen() {
             onBlur={() => { if (!searchQuery) setIsSearching(false); }}
           />
         </View>
+
+        {!isSearching && !selectionMode && (
+          <View style={[styles.sortBar, settings.compactMode && styles.sortBarCompact]}>
+            <Text style={[styles.sortLabel, settings.compactMode && styles.textExtraSmall]}>Sort by:</Text>
+            <TouchableOpacity 
+              style={[styles.sortBtn, sortBy === 'lexical' && styles.sortBtnActive, settings.compactMode && styles.sortBtnCompact]} 
+              onPress={() => toggleSort('lexical')}
+            >
+              <FontAwesome 
+                name="sort-alpha-asc" 
+                size={settings.compactMode ? 12 : 14} 
+                color={sortBy === 'lexical' ? "#fff" : "#888"} 
+              />
+              <Text style={[styles.sortBtnText, sortBy === 'lexical' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Name</Text>
+              {sortBy === 'lexical' && (
+                <FontAwesome 
+                  name={sortOrder === 'asc' ? "caret-up" : "caret-down"} 
+                  size={10} 
+                  color="#fff" 
+                  style={{ marginLeft: 2 }} 
+                />
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.sortBtn, sortBy === 'balance' && styles.sortBtnActive, settings.compactMode && styles.sortBtnCompact]} 
+              onPress={() => toggleSort('balance')}
+            >
+              <FontAwesome 
+                name="dollar" 
+                size={settings.compactMode ? 12 : 14} 
+                color={sortBy === 'balance' ? "#fff" : "#888"} 
+              />
+              <Text style={[styles.sortBtnText, sortBy === 'balance' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Balance</Text>
+              {sortBy === 'balance' && (
+                <FontAwesome 
+                  name={sortOrder === 'asc' ? "caret-up" : "caret-down"} 
+                  size={10} 
+                  color="#fff" 
+                  style={{ marginLeft: 2 }} 
+                />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.sortBtn, sortBy === 'date' && styles.sortBtnActive, settings.compactMode && styles.sortBtnCompact]} 
+              onPress={() => toggleSort('date')}
+            >
+              <FontAwesome 
+                name="clock-o" 
+                size={settings.compactMode ? 12 : 14} 
+                color={sortBy === 'date' ? "#fff" : "#888"} 
+              />
+              <Text style={[styles.sortBtnText, sortBy === 'date' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Added</Text>
+              {sortBy === 'date' && (
+                <FontAwesome 
+                  name={sortOrder === 'asc' ? "caret-up" : "caret-down"} 
+                  size={10} 
+                  color="#fff" 
+                  style={{ marginLeft: 2 }} 
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {filteredPeople.map((person) => {
           const aliases = getAliasesForPerson(person.id);
@@ -572,5 +669,52 @@ const styles = StyleSheet.create({
   searchInputCompact: {
     paddingVertical: 6,
     fontSize: 14,
+  },
+  searchContainerCompact: {
+    marginBottom: 8,
+  },
+  sortBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 15,
+  },
+  sortBarCompact: {
+    marginBottom: 10,
+    gap: 5,
+  },
+  sortLabel: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginRight: 4,
+  },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#222',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#333',
+    gap: 6,
+  },
+  sortBtnCompact: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  sortBtnActive: {
+    backgroundColor: '#2f95dc',
+    borderColor: '#2f95dc',
+  },
+  sortBtnText: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sortBtnTextActive: {
+    color: '#fff',
   },
 });

@@ -4,7 +4,7 @@ import { db } from './index';
 import { items, orderItems, orders, personAliases, persons, transactions, itemAliases, placeAliases, sourceAliases } from './schema';
 
 export const generateId = () => crypto.randomUUID();
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export const api = {
   addPerson: async (name: string, typicalPlace?: string | null, aliases?: string[]) => {
@@ -671,7 +671,8 @@ export const api = {
           id: newId,
           name: p.name,
           typicalPlace: p.typicalPlace,
-          balance: p.balance
+          balance: p.balance,
+          createdAt: p.createdAt // Preserved if exists (Version 2+), otherwise default handles it
         });
         personIdMap[p.id] = newId;
       }
@@ -697,7 +698,8 @@ export const api = {
           name: i.name,
           defaultPrice: i.defaultPrice,
           source: i.source,
-          timing: i.timing
+          timing: i.timing,
+          createdAt: i.createdAt
         });
         itemIdMap[i.id] = newId;
       }
@@ -728,7 +730,7 @@ export const api = {
       for (const pla of data.placeAliases) {
         const existing = await db.select().from(placeAliases).where(and(eq(placeAliases.placeName, pla.placeName), sql`lower(alias) = lower(${pla.alias})`));
         if (existing.length === 0) {
-          await db.insert(placeAliases).values({ id: generateId(), placeName: pla.placeName, alias: pla.alias });
+          await db.insert(placeAliases).values({ id: generateId(), placeName: pla.placeName, alias: pla.alias, createdAt: pla.createdAt });
         }
       }
     }
@@ -736,7 +738,7 @@ export const api = {
       for (const sa of data.sourceAliases) {
         const existing = await db.select().from(sourceAliases).where(and(eq(sourceAliases.sourceName, sa.sourceName), sql`lower(alias) = lower(${sa.alias})`));
         if (existing.length === 0) {
-          await db.insert(sourceAliases).values({ id: generateId(), sourceName: sa.sourceName, alias: sa.alias });
+          await db.insert(sourceAliases).values({ id: generateId(), sourceName: sa.sourceName, alias: sa.alias, createdAt: sa.createdAt });
         }
       }
     }

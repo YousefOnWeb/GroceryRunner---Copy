@@ -21,6 +21,16 @@ export const db = drizzle(expoDb, { schema });
     } catch (e) {
       // Column probably already exists, ignore error
     }
+
+    // resilient check for 'createdAt' in various tables
+    const tablesToUpdate = ['persons', 'items', 'placeAliases', 'sourceAliases'];
+    for (const table of tablesToUpdate) {
+      try {
+        await db.run(sql.raw(`ALTER TABLE ${table} ADD COLUMN createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`));
+      } catch (e) {
+        // Already exists or table doesn't exist yet
+      }
+    }
   } catch (err) {
     console.error('Migration error:', err);
   }

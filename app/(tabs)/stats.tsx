@@ -40,6 +40,12 @@ export default function StatsScreen() {
   const [mergeModalVisible, setMergeModalVisible] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
+  // Sorting State
+  const [itemSort, setItemSort] = useState<'none' | 'lexical' | 'price' | 'date'>('none');
+  const [placeSort, setPlaceSort] = useState<'none' | 'lexical' | 'date'>('none');
+  const [sourceSort, setSourceSort] = useState<'none' | 'lexical' | 'date'>('none');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
   // Derive Places and Sources
   const places = useMemo(() => {
     const set = new Set([
@@ -191,6 +197,19 @@ export default function StatsScreen() {
     setSelectedIds(new Set());
   };
 
+  const toggleSort = (type: any) => {
+    const current = activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort;
+    const setter = activeTab === 'Items' ? setItemSort : activeTab === 'Places' ? setPlaceSort : setSourceSort;
+    
+    if (current === type) {
+      if (sortOrder === 'asc') setSortOrder('desc');
+      else setter('none');
+    } else {
+      setter(type);
+      setSortOrder('asc');
+    }
+  };
+
   // --- RENDER HELPERS ---
 
   const renderItemCard = (item: any) => {
@@ -273,22 +292,76 @@ export default function StatsScreen() {
 
   // --- FILTERING ---
 
-  const filteredItems = catalog?.filter(item => {
+  const sortedItems = useMemo(() => {
+    if (!catalog) return [];
+    let list = [...catalog];
+    if (itemSort === 'lexical') {
+      list.sort((a, b) => sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+    } else if (itemSort === 'price') {
+      list.sort((a, b) => sortOrder === 'asc' ? (a.defaultPrice || 0) - (b.defaultPrice || 0) : (b.defaultPrice || 0) - (a.defaultPrice || 0));
+    } else if (itemSort === 'date') {
+      list.sort((a, b) => {
+        // @ts-ignore
+        const da = a.createdAt || '';
+        // @ts-ignore
+        const db = b.createdAt || '';
+        return sortOrder === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
+      });
+    }
+    return list;
+  }, [catalog, itemSort, sortOrder]);
+
+  const filteredItems = sortedItems.filter(item => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     const aliases = itemAliasesList?.filter(a => a.itemId === item.id).map(a => a.alias) || [];
     const searchString = [item.name, item.defaultPrice?.toString(), item.source, item.timing, ...aliases].join(' ').toLowerCase();
     return searchString.includes(q);
-  }) || [];
+  });
 
-  const filteredPlaces = places.filter(place => {
+  const getEntityDate = (name: string, type: 'Place' | 'Source') => {
+    const aliases = type === 'Place' ? placeAliasesList : sourceAliasesList;
+    const match = aliases?.find(a => (type === 'Place' ? (a as any).placeName : (a as any).sourceName) === name);
+    // @ts-ignore
+    return match?.createdAt || '';
+  };
+
+  const sortedPlaces = useMemo(() => {
+    let list = [...places];
+    if (placeSort === 'lexical') {
+      list.sort((a, b) => sortOrder === 'asc' ? a.localeCompare(b) : b.localeCompare(a));
+    } else if (placeSort === 'date') {
+      list.sort((a, b) => {
+        const da = getEntityDate(a, 'Place');
+        const db = getEntityDate(b, 'Place');
+        return sortOrder === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
+      });
+    }
+    return list;
+  }, [places, placeSort, sortOrder, placeAliasesList]);
+
+  const filteredPlaces = sortedPlaces.filter(place => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     const aliases = placeAliasesList?.filter(a => a.placeName === place).map(a => a.alias) || [];
     return [place, ...aliases].join(' ').toLowerCase().includes(q);
   });
 
-  const filteredSources = sources.filter(source => {
+  const sortedSources = useMemo(() => {
+    let list = [...sources];
+    if (sourceSort === 'lexical') {
+      list.sort((a, b) => sortOrder === 'asc' ? a.localeCompare(b) : b.localeCompare(a));
+    } else if (sourceSort === 'date') {
+      list.sort((a, b) => {
+        const da = getEntityDate(a, 'Source');
+        const db = getEntityDate(b, 'Source');
+        return sortOrder === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
+      });
+    }
+    return list;
+  }, [sources, sourceSort, sortOrder, sourceAliasesList]);
+
+  const filteredSources = sortedSources.filter(source => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     const aliases = sourceAliasesList?.filter(a => a.sourceName === source).map(a => a.alias) || [];
@@ -376,15 +449,59 @@ export default function StatsScreen() {
           </View>
         )}
 
-        <TextInput
-          style={[styles.dictionarySearch, settings.compactMode && styles.dictionarySearchCompact]}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onFocus={() => setIsSearching(true)}
-          onBlur={() => { if (!searchQuery) setIsSearching(false); }}
-          placeholder={`Search ${activeTab.toLowerCase()}...`}
-          placeholderTextColor="#888"
-        />
+        <View style={styles.dictionarySearchRow}>
+          <TextInput
+            style={[styles.dictionarySearch, settings.compactMode && styles.dictionarySearchCompact]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onFocus={() => setIsSearching(true)}
+            onBlur={() => { if (!searchQuery) setIsSearching(false); }}
+            placeholder={`Search ${activeTab.toLowerCase()}...`}
+            placeholderTextColor="#888"
+          />
+        </View>
+
+        {!isSearching && !selectionMode && (
+          <View style={[styles.sortBar, settings.compactMode && styles.sortBarCompact]}>
+            <Text style={[styles.sortLabel, settings.compactMode && styles.textExtraSmall]}>Sort:</Text>
+            
+            <TouchableOpacity 
+              style={[styles.sortBtn, (activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'lexical' && styles.sortBtnActive, settings.compactMode && styles.sortBtnCompact]} 
+              onPress={() => toggleSort('lexical')}
+            >
+              <FontAwesome name="sort-alpha-asc" size={settings.compactMode ? 12 : 14} color={(activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'lexical' ? "#fff" : "#888"} />
+              <Text style={[styles.sortBtnText, (activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'lexical' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>A-Z</Text>
+              {(activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'lexical' && (
+                <FontAwesome name={sortOrder === 'asc' ? "caret-up" : "caret-down"} size={10} color="#fff" style={{ marginLeft: 2 }} />
+              )}
+            </TouchableOpacity>
+
+            {activeTab === 'Items' && (
+              <TouchableOpacity 
+                style={[styles.sortBtn, itemSort === 'price' && styles.sortBtnActive, settings.compactMode && styles.sortBtnCompact]} 
+                onPress={() => toggleSort('price')}
+              >
+                <FontAwesome name="dollar" size={settings.compactMode ? 12 : 14} color={itemSort === 'price' ? "#fff" : "#888"} />
+                <Text style={[styles.sortBtnText, itemSort === 'price' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Price</Text>
+                {itemSort === 'price' && (
+                  <FontAwesome name={sortOrder === 'asc' ? "caret-up" : "caret-down"} size={10} color="#fff" style={{ marginLeft: 2 }} />
+                )}
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity 
+              style={[styles.sortBtn, (activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'date' && styles.sortBtnActive, settings.compactMode && styles.sortBtnCompact]} 
+              onPress={() => toggleSort('date')}
+            >
+              <FontAwesome name="clock-o" size={settings.compactMode ? 12 : 14} color={(activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'date' ? "#fff" : "#888"} />
+              <Text style={[styles.sortBtnText, (activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'date' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Added</Text>
+              {(activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'date' && (
+                <FontAwesome name={sortOrder === 'asc' ? "caret-up" : "caret-down"} size={10} color="#fff" style={{ marginLeft: 2 }} />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
         <Text style={[styles.helperText, settings.compactMode && styles.textExtraSmall]}>
           Long press any item to select, merge, or bulk delete.
         </Text>
@@ -509,4 +626,13 @@ const styles = StyleSheet.create({
   paddingSmall: { padding: 2 },
   selectionHeaderCompact: { padding: 10 },
   compactBtn: { paddingVertical: 6, paddingHorizontal: 10 },
+  sortBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 4 },
+  sortBarCompact: { gap: 6, marginBottom: 8 },
+  sortLabel: { color: '#666', fontSize: 12, fontWeight: 'bold' },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#333', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#444', gap: 6 },
+  sortBtnCompact: { paddingHorizontal: 8, paddingVertical: 4, gap: 4 },
+  sortBtnActive: { backgroundColor: '#2f95dc', borderColor: '#2f95dc' },
+  sortBtnText: { color: '#888', fontSize: 12, fontWeight: '600' },
+  sortBtnTextActive: { color: '#fff' },
+  dictionarySearchRow: { marginBottom: 8 },
 });

@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const persons = sqliteTable('persons', {
@@ -5,6 +6,7 @@ export const persons = sqliteTable('persons', {
   name: text('name').notNull(),
   balance: real('balance').notNull().default(0),
   typicalPlace: text('typicalPlace'),
+  createdAt: text('createdAt').notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const personAliases = sqliteTable('personAliases', {
@@ -19,6 +21,7 @@ export const items = sqliteTable('items', {
   defaultPrice: real('defaultPrice'),
   source: text('source'),
   timing: text('timing', { enum: ['Fresh', 'Anytime'] }).notNull().default('Fresh'),
+  createdAt: text('createdAt').notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const itemAliases = sqliteTable('itemAliases', {
@@ -31,12 +34,14 @@ export const placeAliases = sqliteTable('placeAliases', {
   id: text('id').primaryKey(),
   placeName: text('placeName').notNull(),
   alias: text('alias').notNull(),
+  createdAt: text('createdAt').notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const sourceAliases = sqliteTable('sourceAliases', {
   id: text('id').primaryKey(),
   sourceName: text('sourceName').notNull(),
   alias: text('alias').notNull(),
+  createdAt: text('createdAt').notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 
