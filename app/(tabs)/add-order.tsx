@@ -306,9 +306,11 @@ export default function AddOrderScreen() {
             )}
 
             {!activeSearch && selectedPerson && (
-              <View style={styles.selectedRow}>
-                <Text style={styles.selectedText}>{selectedPerson.name}</Text>
-                <TouchableOpacity onPress={() => { setSelectedPersonId(null); setPersonSearchQuery(''); }}><Text style={styles.changeBtnText}>Change</Text></TouchableOpacity>
+              <View style={[styles.selectedRow, settings.compactMode && styles.selectedRowCompact]}>
+                <Text style={[styles.selectedText, settings.compactMode && styles.textSmall]}>{selectedPerson.name}</Text>
+                <TouchableOpacity onPress={() => { setSelectedPersonId(null); setPersonSearchQuery(''); }}>
+                  <Text style={[styles.changeBtnText, settings.compactMode && styles.textExtraSmall]}>Change</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -396,12 +398,16 @@ export default function AddOrderScreen() {
           <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
             <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>Cart</Text>
             {cart.map((c) => (
-              <View key={c.item.id} style={styles.cartRow}>
-                <Text style={styles.cartText}>{c.item.name}</Text>
+              <View key={c.item.id} style={[styles.cartRow, settings.compactMode && styles.cartRowCompact]}>
+                <Text style={[styles.cartText, settings.compactMode && styles.textSmall]}>{c.item.name}</Text>
                 <View style={styles.cartActions}>
-                  <TouchableOpacity onPress={() => removeFromCart(c.item.id)} style={styles.cartBtn}><FontAwesome name="minus" size={12} /></TouchableOpacity>
-                  <Text style={styles.cartQuantity}>{c.quantity}</Text>
-                  <TouchableOpacity onPress={() => addToCart(c.item)} style={styles.cartBtn}><FontAwesome name="plus" size={12} /></TouchableOpacity>
+                  <TouchableOpacity onPress={() => removeFromCart(c.item.id)} style={[styles.cartBtn, settings.compactMode && styles.cartBtnCompact]}>
+                    <FontAwesome name="minus" size={settings.compactMode ? 10 : 12} />
+                  </TouchableOpacity>
+                  <Text style={[styles.cartQuantity, settings.compactMode && styles.cartQuantityCompact]}>{c.quantity}</Text>
+                  <TouchableOpacity onPress={() => addToCart(c.item)} style={[styles.cartBtn, settings.compactMode && styles.cartBtnCompact]}>
+                    <FontAwesome name="plus" size={settings.compactMode ? 10 : 12} />
+                  </TouchableOpacity>
                 </View>
               </View>
             ))}
@@ -410,8 +416,13 @@ export default function AddOrderScreen() {
       </ScrollView>
 
       {!activeSearch && (
-        <TouchableOpacity style={styles.saveButton} onPress={handleSaveOrder}>
-          <Text style={styles.saveButtonText}>{editModeOrderId ? 'Save Edit' : 'Save Order'}</Text>
+        <TouchableOpacity 
+          style={[styles.saveButton, settings.compactMode && styles.saveButtonCompact]} 
+          onPress={handleSaveOrder}
+        >
+          <Text style={[styles.saveButtonText, settings.compactMode && styles.textSmall]}>
+            {editModeOrderId ? 'Save Edit' : 'Save Order'}
+          </Text>
         </TouchableOpacity>
       )}
 
@@ -467,7 +478,10 @@ const styles = StyleSheet.create({
   badgeCompact: { width: 18, height: 18, top: -4, right: -4 },
   dateDisplayCompact: { padding: 8 },
   cartRowCompact: { marginBottom: 6 },
+  cartBtnCompact: { padding: 5, borderRadius: 10 },
+  cartQuantityCompact: { marginHorizontal: 10, fontSize: 14 },
   saveButtonCompact: { padding: 12, margin: 8 },
+  selectedRowCompact: { padding: 8 },
   textSmall: { fontSize: 14 },
   textExtraSmall: { fontSize: 11 },
 });
