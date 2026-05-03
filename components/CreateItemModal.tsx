@@ -274,7 +274,7 @@ export default function CreateItemModal({
                 />
               </View>
 
-              {isEditMode && (
+              {isEditMode && initialPrice !== null && (
                 <View style={[styles.correctionSection, settings.compactMode && styles.correctionSectionCompact]}>
                   <View style={styles.correctionHeader}>
                     <Text style={[styles.label, { marginTop: 0 }, settings.compactMode && styles.textExtraSmall]}>Update Mode</Text>

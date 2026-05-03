@@ -470,9 +470,10 @@ export const api = {
     if (finalSource !== undefined) finalUpdates.source = finalSource;
     if (updates.name) finalUpdates.name = updates.name.trim();
 
-    // Fetch name for log before update
-    const oldItem = await db.select({ name: items.name }).from(items).where(eq(items.id, id));
+    // Fetch data for log and logic before update
+    const oldItem = await db.select({ name: items.name, defaultPrice: items.defaultPrice }).from(items).where(eq(items.id, id));
     const itemName = oldItem.length > 0 ? oldItem[0].name : 'Item';
+    const oldItemPrice = oldItem.length > 0 ? oldItem[0].defaultPrice : null;
 
     if (Object.keys(finalUpdates).length > 0) {
       await db.update(items).set(finalUpdates).where(eq(items.id, id));
@@ -491,7 +492,6 @@ export const api = {
 
     if (updates.defaultPrice !== undefined) {
       const newPrice = updates.defaultPrice;
-      
       if (isCorrection && newPrice !== null) {
         const allInstances = await db.select({
           oiId: orderItems.id,
@@ -506,29 +506,60 @@ export const api = {
         .where(eq(orderItems.itemId, id));
 
         for (const item of allInstances) {
-          const oldPrice = item.unitPrice ?? 0;
-          const diff = (newPrice - oldPrice) * item.quantity;
+          if (oldItemPrice === null) {
+            // INITIALIZING PRICE for the first time
+            if (item.unitPrice === null) {
+              await db.update(orderItems)
+                .set({ unitPrice: newPrice })
+                .where(eq(orderItems.id, item.oiId));
+              
+              if (!item.isPaid) {
+                // If it wasn't paid yet, the person now owes this money
+                const addedDebt = newPrice * item.quantity;
+                await db.update(persons)
+                  .set({ balance: sql`${persons.balance} - ${addedDebt}` })
+                  .where(eq(persons.id, item.personId));
 
-          if (diff !== 0) {
-            await db.update(orderItems)
-              .set({ unitPrice: newPrice })
-              .where(eq(orderItems.id, item.oiId));
+                await db.insert(transactions).values({
+                  id: generateId(),
+                  personId: item.personId,
+                  amount: -addedDebt,
+                  date: new Date().toISOString(),
+                  type: 'OrderCost',
+                  note: `Price finalized for ${itemName}`,
+                });
+              }
+              // If it WAS already paid before we knew the price, we don't adjust balance (user's "already settled" rule)
+            }
+          } else {
+            // ACTUAL CORRECTION of an existing price
+            const effectiveOldPrice = item.unitPrice ?? 0;
+            const diff = (newPrice - effectiveOldPrice) * item.quantity;
 
-            await db.update(persons)
-              .set({ balance: sql`${persons.balance} - ${diff}` })
-              .where(eq(persons.id, item.personId));
+            if (diff !== 0) {
+              await db.update(orderItems)
+                .set({ unitPrice: newPrice })
+                .where(eq(orderItems.id, item.oiId));
 
-            await db.insert(transactions).values({
-              id: generateId(),
-              personId: item.personId,
-              amount: -diff,
-              date: new Date().toISOString(),
-              type: 'ManualAdjustment',
-              note: `Price correction for ${itemName}: $${oldPrice} -> $${newPrice}`,
-            });
+              // For corrections, we always adjust balance (even if paid, as per user's request)
+              await db.update(persons)
+                .set({ balance: sql`${persons.balance} - ${diff}` })
+                .where(eq(persons.id, item.personId));
+
+              await db.insert(transactions).values({
+                id: generateId(),
+                personId: item.personId,
+                amount: -diff,
+                date: new Date().toISOString(),
+                type: 'ManualAdjustment',
+                note: `Price correction for ${itemName}: $${effectiveOldPrice} -> $${newPrice}`,
+              });
+            }
           }
         }
       } else if (newPrice !== null) {
+        // MARKET CHANGE (Default)
+        // Only updates items that have NO price set yet (Unknown Price items)
         const pendingItems = await db.select({
           oiId: orderItems.id,
           quantity: orderItems.quantity,
@@ -544,13 +575,12 @@ export const api = {
         ));
 
         for (const item of pendingItems) {
-          const addedDebt = item.quantity * newPrice;
-          
           await db.update(orderItems)
             .set({ unitPrice: newPrice })
             .where(eq(orderItems.id, item.oiId));
 
           if (!item.isPaid) {
+            const addedDebt = newPrice * item.quantity;
             await db.update(persons)
               .set({ balance: sql`${persons.balance} - ${addedDebt}` })
               .where(eq(persons.id, item.personId));
