@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { Modal, ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator, I18nManager } from 'react-native';
 import { Text } from './Themed';
 import { api } from '@/db/api';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSettings } from '@/utils/settings';
+import { useTranslation } from '@/utils/i18n';
 
 interface CreditLogModalProps {
   visible: boolean;
@@ -16,6 +17,7 @@ export default function CreditLogModal({ visible, personId, personName, onClose 
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { settings } = useSettings();
+  const { t, isRTL } = useTranslation();
 
   useEffect(() => {
     if (visible && personId) {
@@ -37,10 +39,12 @@ export default function CreditLogModal({ visible, personId, personName, onClose 
 
   const formatDateTime = (isoString: string) => {
     const d = new Date(isoString);
-    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weekdays = t('modals.daysShort').split(',');
     const day = weekdays[d.getDay()];
-    const date = d.toLocaleDateString();
-    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // For locale-aware date/time formatting
+    const locale = isRTL ? 'ar' : 'en-US';
+    const date = d.toLocaleDateString(locale);
+    const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     return `${day}, ${date} ${time}`;
   };
 
@@ -53,7 +57,7 @@ export default function CreditLogModal({ visible, personId, personName, onClose 
       <View style={styles.overlay}>
         <View style={[styles.dialog, settings.compactMode && styles.dialogCompact]}>
           <View style={styles.header}>
-            <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>Credit Log: {personName}</Text>
+            <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>{t('modals.creditLogTitle', { name: personName })}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <FontAwesome name="times" size={20} color="#888" />
             </TouchableOpacity>
@@ -77,7 +81,7 @@ export default function CreditLogModal({ visible, personId, personName, onClose 
                 </View>
               ))}
               {logs.length === 0 && (
-                <Text style={styles.emptyText}>No transaction history found.</Text>
+                <Text style={styles.emptyText}>{t('modals.noTransactions')}</Text>
               )}
             </ScrollView>
           )}
@@ -110,7 +114,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
   },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  title: { fontSize: 20, fontWeight: 'bold', color: '#fff', textAlign: I18nManager.isRTL ? 'right' : 'left' },
   titleCompact: { fontSize: 16 },
   closeBtn: { padding: 5 },
   logList: { flexGrow: 0 },
@@ -126,9 +130,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  logDate: { color: '#888', fontSize: 12 },
+  logDate: { color: '#888', fontSize: 12, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   logAmount: { fontWeight: 'bold', fontSize: 16 },
-  logNote: { color: '#eee', fontSize: 14 },
+  logNote: { color: '#eee', fontSize: 14, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   emptyText: { color: '#666', textAlign: 'center', marginTop: 20, fontStyle: 'italic' },
   textSmall: { fontSize: 13 },
   textExtraSmall: { fontSize: 11 },

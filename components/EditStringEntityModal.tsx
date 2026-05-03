@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, I18nManager } from 'react-native';
 import { Text, View } from './Themed';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useTranslation } from '@/utils/i18n';
 
 interface EditStringEntityModalProps {
   visible: boolean;
@@ -17,6 +18,7 @@ export default function EditStringEntityModal({ visible, entityType, initialName
   const [aliases, setAliases] = useState<string[]>(initialAliases);
   const [newAlias, setNewAlias] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (visible) {
@@ -43,7 +45,7 @@ export default function EditStringEntityModal({ visible, entityType, initialName
   const handleSubmit = async () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      alert(`${entityType} name is required.`);
+      alert(t('modals.entityNameRequired', { entityType: t(`modals.${entityType.toLowerCase()}`) }));
       return;
     }
 
@@ -53,7 +55,7 @@ export default function EditStringEntityModal({ visible, entityType, initialName
       onClose();
     } catch (e) {
       console.error(e);
-      alert(`Failed to update ${entityType}.`);
+      alert(t('modals.updateEntityFailed', { entityType: t(`modals.${entityType.toLowerCase()}`) }));
     } finally {
       setIsSubmitting(false);
     }
@@ -67,14 +69,14 @@ export default function EditStringEntityModal({ visible, entityType, initialName
       >
         <View style={styles.modalContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>Edit {entityType}</Text>
+            <Text style={styles.title}>{t('modals.editEntityTitle', { entityType: t(`modals.${entityType.toLowerCase()}`) })}</Text>
             <TouchableOpacity onPress={onClose} disabled={isSubmitting}>
               <FontAwesome name="times" size={24} color="#888" />
             </TouchableOpacity>
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>{entityType} Name *</Text>
+            <Text style={styles.label}>{t('modals.entityNameLabel', { entityType: t(`modals.${entityType.toLowerCase()}`) })}</Text>
             <TextInput
               style={styles.input}
               value={name}
@@ -86,8 +88,8 @@ export default function EditStringEntityModal({ visible, entityType, initialName
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Aliases / Nicknames</Text>
-            <Text style={styles.hint}>Help recognition when typing different names.</Text>
+            <Text style={styles.label}>{t('modals.aliasesLabelPerson')}</Text>
+            <Text style={styles.hint}>{t('modals.aliasesHintPerson')}</Text>
             
             <View style={styles.aliasList}>
               {aliases.map((alias, idx) => (
@@ -105,7 +107,7 @@ export default function EditStringEntityModal({ visible, entityType, initialName
                 style={[styles.input, { flex: 1 }]}
                 value={newAlias}
                 onChangeText={setNewAlias}
-                placeholder="Add a nickname..."
+                placeholder={t('modals.addAliasPlaceholderPerson')}
                 placeholderTextColor="#666"
                 onSubmitEditing={addAlias}
                 returnKeyType="done"
@@ -121,10 +123,10 @@ export default function EditStringEntityModal({ visible, entityType, initialName
 
           <View style={styles.actions}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={isSubmitting}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSubmit} disabled={isSubmitting}>
-              <Text style={styles.saveText}>{isSubmitting ? 'Saving...' : 'Save Changes'}</Text>
+              <Text style={styles.saveText}>{isSubmitting ? t('modals.saving') : t('modals.saveChanges')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -157,15 +159,18 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 20,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   formGroup: {
     marginBottom: 15,
   },
   label: {
-    color: '#ccc',
+    fontSize: 14,
+    color: '#aaa',
     marginBottom: 5,
-    fontSize: 16,
-    fontWeight: '600',
+    marginTop: 10,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   input: {
     backgroundColor: '#333',

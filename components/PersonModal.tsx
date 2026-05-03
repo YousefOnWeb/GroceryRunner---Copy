@@ -1,7 +1,7 @@
 import { Text } from '@/components/Themed';
 import { api } from '@/db/api';
 import React, { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Keyboard } from 'react-native';
+import { Alert, I18nManager, Keyboard, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSettings } from '@/utils/settings';
 import CreditLogModal from './CreditLogModal';
@@ -9,6 +9,7 @@ import SmartTextInput from './SmartTextInput';
 import { COMMON_NAMES_CORPUS } from '@/utils/textMatching';
 import { db } from '@/db';
 import { persons } from '@/db/schema';
+import { useTranslation } from '@/utils/i18n';
 
 interface PersonModalProps {
   visible: boolean;
@@ -49,6 +50,7 @@ export default function PersonModal({
   const [activeFocus, setActiveFocus] = useState<string | null>(null);
   const [namesCorpus, setNamesCorpus] = useState<string[]>(COMMON_NAMES_CORPUS);
   const { settings } = useSettings();
+  const { t } = useTranslation();
 
   const initialAliasesKey = JSON.stringify(initialAliases);
 
@@ -89,11 +91,11 @@ export default function PersonModal({
     const trimmed = newAlias.trim();
     if (!trimmed) return;
     if (aliases.some(a => a.toLowerCase() === trimmed.toLowerCase())) {
-      Alert.alert('Duplicate', 'This nickname already exists.');
+      Alert.alert(t('modals.duplicate'), t('modals.nicknameExists'));
       return;
     }
     if (trimmed.toLowerCase() === name.toLowerCase()) {
-      Alert.alert('Duplicate', 'Nickname cannot be the same as the primary name.');
+      Alert.alert(t('modals.duplicate'), t('modals.nicknameSame'));
       return;
     }
     setAliases(prev => [...prev, trimmed]);
@@ -110,14 +112,14 @@ export default function PersonModal({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Name is required.');
+      Alert.alert(t('common.error'), t('modals.nameRequired'));
       return;
     }
 
     try {
       if (mode === 'create') {
         const result = await api.addPerson(name, place || null, aliases);
-        Alert.alert('Success', `${name} has been added.`);
+        Alert.alert(t('common.success'), t('modals.personAdded', { name }));
         onDone(result[0].id);
       } else if (mode === 'edit' && personId) {
         await api.updatePerson(personId, {
@@ -131,7 +133,7 @@ export default function PersonModal({
           const amount = parseFloat(adjustAmount);
           if (!isNaN(amount) && amount > 0) {
             if (!adjustNote.trim()) {
-              Alert.alert('Note Required', 'Please enter a note for this manual credit adjustment.');
+              Alert.alert(t('modals.noteRequired'), t('modals.creditNoteRequired'));
               return;
             }
             const finalAmount = adjustType === 'increase' ? amount : -amount;
@@ -139,24 +141,24 @@ export default function PersonModal({
           }
         }
 
-        Alert.alert('Success', `${name} has been updated.`);
+        Alert.alert(t('common.success'), t('modals.personUpdated', { name }));
       }
       onDone();
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Failed to save person.');
+      Alert.alert(t('common.error'), t('modals.personSaveFailed'));
     }
   };
 
   const handleDelete = () => {
     if (!personId) return;
     Alert.alert(
-      'Delete Person',
-      `Are you sure you want to delete ${initialName}? This will also delete all their orders and transaction history.`,
+      t('modals.deletePerson'),
+      t('modals.deletePersonConfirm', { name: initialName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -164,7 +166,7 @@ export default function PersonModal({
               onDone();
             } catch (e) {
               console.error(e);
-              Alert.alert('Error', 'Failed to delete person.');
+              Alert.alert(t('common.error'), t('modals.deletePersonFailed'));
             }
           },
         },
@@ -177,7 +179,7 @@ export default function PersonModal({
       <View style={styles.overlay}>
         <ScrollView style={styles.dialog} contentContainerStyle={styles.dialogContent} keyboardShouldPersistTaps="handled">
           <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>
-            {mode === 'create' ? 'Add New Person' : `Edit: ${initialName}`}
+            {mode === 'create' ? t('modals.addNewPerson') : t('modals.editPerson', { name: initialName })}
           </Text>
 
           {activeFocus && (
@@ -188,22 +190,22 @@ export default function PersonModal({
                 Keyboard.dismiss();
               }}
             >
-              <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
-              <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Focus Mode</Text>
+              <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+              <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('common.exitFocusMode')}</Text>
             </TouchableOpacity>
           )}
 
           {/* Name */}
           {(!activeFocus || activeFocus === 'name') && (
             <>
-              <Text style={styles.label}>Name</Text>
+              <Text style={styles.label}>{t('modals.nameLabel')}</Text>
               <SmartTextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
                 onFocus={() => setActiveFocus('name')}
                 onBlur={() => { if (!name) setActiveFocus(null); }}
-                placeholder="Primary name"
+                placeholder={t('modals.namePlaceholder')}
                 placeholderTextColor="#888"
                 corpus={namesCorpus}
                 compactMode={settings.compactMode}
@@ -214,7 +216,7 @@ export default function PersonModal({
           {/* Typical Place */}
           {(!activeFocus || activeFocus === 'place') && (
             <>
-              <Text style={styles.label}>Typical Location</Text>
+              <Text style={styles.label}>{t('modals.placeLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={place}
@@ -232,7 +234,7 @@ export default function PersonModal({
                     if (!place) setActiveFocus(null);
                   }, 150);
                 }}
-                placeholder="e.g. Building A, Floor 3"
+                placeholder={t('modals.placePlaceholder')}
                 placeholderTextColor="#888"
               />
               {showPlaceSuggestions && filteredPlaces.length > 0 && (
@@ -257,9 +259,9 @@ export default function PersonModal({
           {/* Nicknames/Aliases */}
           {(!activeFocus || activeFocus === 'aliases') && (
             <>
-              <Text style={styles.label}>Nicknames / Aliases</Text>
+              <Text style={styles.label}>{t('modals.aliasesLabelPerson')}</Text>
               <Text style={styles.hint}>
-                These help the app recognize the same person when you type a different name.
+                {t('modals.aliasesHintPerson')}
               </Text>
               {aliases.map((alias, idx) => (
                 <View key={idx} style={styles.aliasRow}>
@@ -276,7 +278,7 @@ export default function PersonModal({
                   onChangeText={setNewAlias}
                   onFocus={() => setActiveFocus('aliases')}
                   onBlur={() => { if (!newAlias) setActiveFocus(null); }}
-                  placeholder="Add a nickname..."
+                  placeholder={t('modals.addAliasPlaceholderPerson')}
                   placeholderTextColor="#888"
                   onSubmitEditing={addAlias}
                   returnKeyType="done"
@@ -297,22 +299,22 @@ export default function PersonModal({
           {!activeFocus && mode === 'edit' && (
             <>
               <View style={styles.divider} />
-              <Text style={styles.label}>Adjust Credit</Text>
+              <Text style={styles.label}>{t('modals.adjustCredit')}</Text>
               <Text style={styles.hint}>
-                Current balance: ${initialBalance.toFixed(2)}
+                {t('modals.currentBalance', { balance: initialBalance.toFixed(2) })}
               </Text>
               <View style={styles.adjustRow}>
                 <TouchableOpacity
                   style={[styles.adjustTypeBtn, adjustType === 'increase' && styles.adjustTypeBtnActive]}
                   onPress={() => setAdjustType(adjustType === 'increase' ? null : 'increase')}>
                   <FontAwesome name="plus" size={14} color={adjustType === 'increase' ? '#fff' : '#00C851'} />
-                  <Text style={[styles.adjustTypeText, adjustType === 'increase' && { color: '#fff' }]}>Increase</Text>
+                  <Text style={[styles.adjustTypeText, adjustType === 'increase' && { color: '#fff' }]}>{t('modals.increase')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.adjustTypeBtn, styles.adjustTypeBtnDanger, adjustType === 'decrease' && styles.adjustTypeBtnDangerActive]}
                   onPress={() => setAdjustType(adjustType === 'decrease' ? null : 'decrease')}>
                   <FontAwesome name="minus" size={14} color={adjustType === 'decrease' ? '#fff' : '#ff4444'} />
-                  <Text style={[styles.adjustTypeText, { color: adjustType === 'decrease' ? '#fff' : '#ff4444' }]}>Decrease</Text>
+                  <Text style={[styles.adjustTypeText, { color: adjustType === 'decrease' ? '#fff' : '#ff4444' }]}>{t('modals.decrease')}</Text>
                 </TouchableOpacity>
               </View>
               {adjustType && (
@@ -321,7 +323,7 @@ export default function PersonModal({
                     style={[styles.input, settings.compactMode && styles.inputCompact]}
                     value={adjustAmount}
                     onChangeText={setAdjustAmount}
-                    placeholder="Amount (e.g. 50)"
+                    placeholder={t('modals.amountPlaceholder')}
                     placeholderTextColor="#888"
                     keyboardType="numeric"
                   />
@@ -329,7 +331,7 @@ export default function PersonModal({
                     style={[styles.input, settings.compactMode && styles.inputCompact]}
                     value={adjustNote}
                     onChangeText={setAdjustNote}
-                    placeholder="Note for this adjustment..."
+                    placeholder={t('modals.notePlaceholder')}
                     placeholderTextColor="#888"
                   />
                 </>
@@ -340,7 +342,7 @@ export default function PersonModal({
                 onPress={() => setLogVisible(true)}
               >
                 <FontAwesome name="history" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
-                <Text style={[styles.logLinkText, settings.compactMode && styles.textSmall]}>View Credit Log / Transaction History</Text>
+                <Text style={[styles.logLinkText, settings.compactMode && styles.textSmall]}>{t('modals.viewCreditLog')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -351,18 +353,18 @@ export default function PersonModal({
               {mode === 'edit' && (
                 <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
                   <FontAwesome name="trash" size={settings.compactMode ? 14 : 18} color="#ff4444" />
-                  <Text style={[styles.deleteBtnText, settings.compactMode && styles.textSmall]}>Delete</Text>
+                  <Text style={[styles.deleteBtnText, settings.compactMode && styles.textSmall]}>{t('common.delete')}</Text>
                 </TouchableOpacity>
               )}
               <View style={{ flex: 1 }} />
               <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-                <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>Cancel</Text>
+                <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }, settings.compactMode && styles.submitBtnCompact]}
                 onPress={handleSubmit}
                 disabled={!name.trim()}>
-                <Text style={[styles.submitBtnText, settings.compactMode && styles.textSmall]}>{mode === 'create' ? 'Add Person' : 'Save Changes'}</Text>
+                <Text style={[styles.submitBtnText, settings.compactMode && styles.textSmall]}>{mode === 'create' ? t('modals.addPersonBtn') : t('modals.saveChanges')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -409,6 +411,7 @@ const styles = StyleSheet.create({
     color: '#aaa',
     marginBottom: 5,
     marginTop: 10,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   hint: {
     fontSize: 12,
@@ -425,6 +428,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#444',
     marginBottom: 5,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   suggestionsContainer: {
     backgroundColor: '#333',
@@ -442,6 +446,7 @@ const styles = StyleSheet.create({
   suggestionText: {
     color: '#2f95dc',
     fontSize: 14,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   aliasRow: {
     flexDirection: 'row',

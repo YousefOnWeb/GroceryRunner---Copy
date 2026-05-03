@@ -10,9 +10,10 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { and, eq, sql } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput, KeyboardAvoidingView, Platform, Keyboard, I18nManager } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSettings } from '@/utils/settings';
+import { useTranslation } from '@/utils/i18n';
 
 interface EditState {
   personId: string;
@@ -26,6 +27,7 @@ export default function PeopleScreen() {
   const { data: peopleList } = useLiveQuery(db.select().from(persons));
   const { data: allAliases } = useLiveQuery(db.select().from(personAliases));
   const { settings } = useSettings();
+  const { t, isRTL } = useTranslation();
 
   // Create person modal
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -117,11 +119,11 @@ export default function PeopleScreen() {
 
   const getBalanceLabel = (balance: number, hasUnknownPrices: boolean) => {
     if (balance < 0) {
-      return `Your money with them: $${Math.abs(balance).toFixed(2)}`;
+      return t('people.yourMoneyWithThem', { amount: Math.abs(balance).toFixed(2) });
     } else if (balance > 0) {
-      return `Their money with you: $${balance.toFixed(2)}`;
+      return t('people.theirMoneyWithYou', { amount: balance.toFixed(2) });
     } else {
-      return hasUnknownPrices ? 'Awaiting Prices' : 'Settled';
+      return hasUnknownPrices ? t('people.awaitingPrices') : t('people.settled');
     }
   };
 
@@ -140,8 +142,8 @@ export default function PeopleScreen() {
 
     const allTx = await db.select().from(transactions).orderBy(sql`${transactions.date} DESC`);
 
-    let text = `👥 PEOPLE & BALANCES SUMMARY\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    let text = `${t('people.summaryTitle')}\n`;
+    text += `${t('people.summarySeparator')}\n\n`;
 
     peopleList.forEach(p => {
       const hasUnknownPrices = peopleWithUnknownPrices.has(p.id);
@@ -150,17 +152,17 @@ export default function PeopleScreen() {
 
       if (p.balance < 0) {
         statusIcon = '❌';
-        balText = `You are owed: $${Math.abs(p.balance).toFixed(2)}`;
+        balText = t('people.youAreOwed', { amount: Math.abs(p.balance).toFixed(2) });
       } else if (p.balance > 0) {
         statusIcon = '✅'; // They have credit with you
-        balText = `They have credit: $${p.balance.toFixed(2)}`;
+        balText = t('people.theyHaveCredit', { amount: p.balance.toFixed(2) });
       } else {
         if (hasUnknownPrices) {
           statusIcon = '❌';
-          balText = `Awaiting Prices (TBD)`;
+          balText = t('people.awaitingPricesTBD');
         } else {
           statusIcon = '✅';
-          balText = `Settled`;
+          balText = t('people.settled');
         }
       }
 
@@ -171,17 +173,17 @@ export default function PeopleScreen() {
       // Include Logs
       const personTx = allTx.filter(tx => tx.personId === p.id);
       if (personTx.length > 0) {
-        text += `   📜 Recent Logs:\n`;
+        text += `   📜 ${t('people.recentLogs')}\n`;
         personTx.slice(0, 5).forEach(tx => {
           const d = new Date(tx.date);
-          const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const weekdays = t('people.daysShort').split(',');
           const day = weekdays[d.getDay()];
-          const dateStr = `${day}, ${d.toLocaleDateString()}`;
+          const dateStr = `${day}, ${d.toLocaleDateString(isRTL ? 'ar' : 'en-US')}`;
           const amountStr = tx.amount >= 0 ? `+$${tx.amount.toFixed(2)}` : `-$${Math.abs(tx.amount).toFixed(2)}`;
           text += `     • ${dateStr}: ${amountStr} (${tx.note || tx.type})\n`;
         });
         if (personTx.length > 5) {
-          text += `     ... and ${personTx.length - 5} more transactions\n`;
+          text += `     ${t('people.moreTransactions', { count: personTx.length - 5 })}\n`;
         }
       }
 
@@ -189,7 +191,7 @@ export default function PeopleScreen() {
     });
 
     await Clipboard.setStringAsync(text);
-    Alert.alert('Copied!', 'Balance summary copied to clipboard.');
+    Alert.alert(t('run.copiedTitle'), t('people.balanceSummaryCopied'));
   };
 
   const toggleSelection = (id: string) => {
@@ -211,12 +213,12 @@ export default function PeopleScreen() {
 
   const handleBulkDelete = () => {
     Alert.alert(
-      'Delete Selected People',
-      `Are you sure you want to delete ${selectedPersons.size} people? This will permanently delete all their order history and balance logs.`,
+      t('people.deleteConfirmTitle'),
+      t('people.deleteConfirmBody', { count: selectedPersons.size }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -227,7 +229,7 @@ export default function PeopleScreen() {
               setSelectedPersons(new Set());
             } catch (e) {
               console.error(e);
-              Alert.alert('Error', 'Failed to delete some people.');
+              Alert.alert(t('common.error'), t('people.deleteError'));
             }
           },
         },
@@ -280,21 +282,21 @@ export default function PeopleScreen() {
               Keyboard.dismiss();
             }}
           >
-            <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
-            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Search Mode</Text>
+            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('addOrder.exitSearch')}</Text>
           </TouchableOpacity>
         )}
 
         {!isSearching && !selectionMode && (
           <View style={[styles.headerRow, settings.compactMode && styles.headerRowCompact]}>
-            <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>Balances</Text>
+            <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>{t('people.title')}</Text>
             <View style={styles.headerActions}>
               <TouchableOpacity onPress={handleCopyPeople} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
                 <FontAwesome name="copy" size={settings.compactMode ? 16 : 20} color="#2f95dc" />
               </TouchableOpacity>
               <TouchableOpacity style={[styles.addBtn, settings.compactMode && styles.addBtnCompact]} onPress={() => setCreateModalVisible(true)}>
                 <FontAwesome name="plus" size={settings.compactMode ? 12 : 16} color="#fff" />
-                <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Add Person</Text>
+                <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>{t('people.addPersonBtn')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -306,18 +308,18 @@ export default function PeopleScreen() {
               <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedPersons(new Set()); }}>
                 <FontAwesome name="times" size={settings.compactMode ? 20 : 24} color="#fff" />
               </TouchableOpacity>
-              <Text style={styles.selectionTitle}>{selectedPersons.size} Selected</Text>
+              <Text style={styles.selectionTitle}>{selectedPersons.size} {t('run.selected')}</Text>
             </View>
             <View style={styles.headerActions}>
               {selectedPersons.size === 2 && (
                 <TouchableOpacity style={[styles.mergeBtn, settings.compactMode && styles.compactBtn]} onPress={() => setMergeModalVisible(true)}>
                   <FontAwesome name="compress" size={settings.compactMode ? 14 : 16} color="#fff" />
-                  <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Merge</Text>
+                  <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>{t('common.edit')}</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={[styles.bulkDeleteBtn, settings.compactMode && styles.compactBtn]} onPress={handleBulkDelete}>
                 <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#fff" />
-                <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Delete</Text>
+                <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>{t('common.delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -328,7 +330,7 @@ export default function PeopleScreen() {
             style={[styles.searchInput, settings.compactMode && styles.searchInputCompact]}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search name, place or alias..."
+            placeholder={t('people.searchPlaceholder')}
             placeholderTextColor="#888"
             onFocus={() => setIsSearching(true)}
             onBlur={() => { if (!searchQuery) setIsSearching(false); }}
@@ -337,7 +339,7 @@ export default function PeopleScreen() {
 
         {!isSearching && !selectionMode && (
           <View style={[styles.sortBar, settings.compactMode && styles.sortBarCompact]}>
-            <Text style={[styles.sortLabel, settings.compactMode && styles.textExtraSmall]}>Sort by:</Text>
+            <Text style={[styles.sortLabel, settings.compactMode && styles.textExtraSmall]}>{t('people.sortLabel')}</Text>
             <TouchableOpacity 
               style={[styles.sortBtn, sortBy === 'lexical' && styles.sortBtnActive, settings.compactMode && styles.sortBtnCompact]} 
               onPress={() => toggleSort('lexical')}
@@ -347,13 +349,13 @@ export default function PeopleScreen() {
                 size={settings.compactMode ? 12 : 14} 
                 color={sortBy === 'lexical' ? "#fff" : "#888"} 
               />
-              <Text style={[styles.sortBtnText, sortBy === 'lexical' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Name</Text>
+              <Text style={[styles.sortBtnText, sortBy === 'lexical' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>{t('people.sortName')}</Text>
               {sortBy === 'lexical' && (
                 <FontAwesome 
                   name={sortOrder === 'asc' ? "caret-up" : "caret-down"} 
                   size={10} 
                   color="#fff" 
-                  style={{ marginLeft: 2 }} 
+                  style={{ marginStart: 2 }} 
                 />
               )}
             </TouchableOpacity>
@@ -367,13 +369,13 @@ export default function PeopleScreen() {
                 size={settings.compactMode ? 12 : 14} 
                 color={sortBy === 'balance' ? "#fff" : "#888"} 
               />
-              <Text style={[styles.sortBtnText, sortBy === 'balance' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Balance</Text>
+              <Text style={[styles.sortBtnText, sortBy === 'balance' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>{t('people.sortBalance')}</Text>
               {sortBy === 'balance' && (
                 <FontAwesome 
                   name={sortOrder === 'asc' ? "caret-up" : "caret-down"} 
                   size={10} 
                   color="#fff" 
-                  style={{ marginLeft: 2 }} 
+                  style={{ marginStart: 2 }} 
                 />
               )}
             </TouchableOpacity>
@@ -387,13 +389,13 @@ export default function PeopleScreen() {
                 size={settings.compactMode ? 12 : 14} 
                 color={sortBy === 'date' ? "#fff" : "#888"} 
               />
-              <Text style={[styles.sortBtnText, sortBy === 'date' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Added</Text>
+              <Text style={[styles.sortBtnText, sortBy === 'date' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>{t('people.sortAdded')}</Text>
               {sortBy === 'date' && (
                 <FontAwesome 
                   name={sortOrder === 'asc' ? "caret-up" : "caret-down"} 
                   size={10} 
                   color="#fff" 
-                  style={{ marginLeft: 2 }} 
+                  style={{ marginStart: 2 }} 
                 />
               )}
             </TouchableOpacity>
@@ -432,14 +434,14 @@ export default function PeopleScreen() {
                   </View>
                 </View>
                 {person.typicalPlace ? (
-                  <Text style={[styles.place, settings.compactMode && styles.textExtraSmall]}>📍 {person.typicalPlace}</Text>
+                  <Text style={[styles.place, settings.compactMode && styles.textExtraSmall, { alignSelf: 'flex-start' }]}>📍 {person.typicalPlace}</Text>
                 ) : null}
                 {aliases.length > 0 ? (
-                  <Text style={[styles.aliases, settings.compactMode && styles.textExtraSmall]}>
-                    aka: {aliases.join(', ')}
+                  <Text style={[styles.aliases, settings.compactMode && styles.textExtraSmall, { alignSelf: 'flex-start' }]}>
+                    {t('people.aka')} {aliases.join(', ')}
                   </Text>
                 ) : null}
-                <View style={[styles.balanceRow, settings.compactMode && styles.balanceRowCompact]}>
+                <View style={[styles.balanceRow, settings.compactMode && styles.balanceRowCompact, { alignSelf: 'flex-start' }]}>
                   <Text style={[styles.balance, settings.compactMode && styles.textSmall, { color: getBalanceColor(person.balance, peopleWithUnknownPrices.has(person.id)) }]}>
                     {getBalanceLabel(person.balance, peopleWithUnknownPrices.has(person.id))}
                   </Text>
@@ -467,13 +469,13 @@ export default function PeopleScreen() {
         })}
 
         {peopleList?.length === 0 && (
-          <Text style={styles.emptyText}>No people added yet. Tap "Add Person" or add them when creating an order.</Text>
+          <Text style={styles.emptyText}>{t('people.emptyList')}</Text>
         )}
 
         {searchQuery.trim() !== '' && filteredPeople.length === 0 && (
           <View style={styles.noResultsContainer}>
             <FontAwesome name="search" size={48} color="#444" style={{ marginBottom: 10 }} />
-            <Text style={styles.noResultsText}>No one found matching "{searchQuery}"</Text>
+            <Text style={styles.noResultsText}>{t('people.noMatch', { query: searchQuery })}</Text>
           </View>
         )}
       </ScrollView>
@@ -576,7 +578,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  name: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  name: { fontSize: 18, fontWeight: 'bold', color: '#fff', textAlign: I18nManager.isRTL ? 'right' : 'left' },
   personActions: { flexDirection: 'row', gap: 12 },
   iconBtn: {
     padding: 6,
@@ -585,12 +587,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#8bb8e8',
     marginBottom: 3,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   aliases: {
     fontSize: 12,
     color: '#888',
     fontStyle: 'italic',
     marginBottom: 3,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   balanceRow: {
     flexDirection: 'row',
@@ -598,7 +602,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 2,
   },
-  balance: { fontSize: 14, fontWeight: '600' },
+  balance: { fontSize: 14, fontWeight: '600', textAlign: I18nManager.isRTL ? 'right' : 'left' },
   notesBtn: {
     padding: 4,
   },
@@ -687,7 +691,7 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 12,
     fontWeight: 'bold',
-    marginRight: 4,
+    marginEnd: 4,
   },
   sortBtn: {
     flexDirection: 'row',

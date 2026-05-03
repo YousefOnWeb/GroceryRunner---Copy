@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, Keyboard, I18nManager } from 'react-native';
 import { useSettings } from '@/utils/settings';
 import { Text, View } from '@/components/Themed';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -10,6 +10,7 @@ import CreateItemModal from '@/components/CreateItemModal';
 import EditStringEntityModal from '@/components/EditStringEntityModal';
 import MergeModal from '@/components/MergeModal';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useTranslation } from '@/utils/i18n';
 
 const EMPTY_ARRAY: any[] = [];
 
@@ -24,6 +25,7 @@ export default function StatsScreen() {
   const { data: sourceAliasesList } = useLiveQuery(db.select().from(sourceAliases));
 
   const { settings } = useSettings();
+  const { t } = useTranslation();
 
   const [activeTab, setActiveTab] = useState<'Items' | 'Places' | 'Sources'>('Items');
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,12 +144,12 @@ export default function StatsScreen() {
 
   const handleBulkDelete = () => {
     Alert.alert(
-      `Delete Selected ${activeTab}`,
-      `Are you sure you want to delete ${selectedIds.size} ${activeTab.toLowerCase()}?`,
+      t('stats.deleteConfirmTitle'),
+      t('stats.deleteConfirmBody', { count: selectedIds.size, tab: activeTab.toLowerCase() }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -160,7 +162,7 @@ export default function StatsScreen() {
               setSelectedIds(new Set());
             } catch (e) {
               console.error(e);
-              Alert.alert('Error', 'Failed to delete some entries.');
+              Alert.alert(t('common.error'), t('stats.deleteError'));
             }
           },
         },
@@ -177,8 +179,8 @@ export default function StatsScreen() {
       const i2 = catalog?.find(c => c.id === ids[1]);
       if (!i1 || !i2) return { entityA: null, entityB: null };
       return {
-        entityA: { id: i1.id, name: i1.name, details: `Source: ${i1.source || 'N/A'}` },
-        entityB: { id: i2.id, name: i2.name, details: `Source: ${i2.source || 'N/A'}` }
+        entityA: { id: i1.id, name: i1.name, details: `${t('stats.detailsSource')} ${i1.source || t('stats.na')}` },
+        entityB: { id: i2.id, name: i2.name, details: `${t('stats.detailsSource')} ${i2.source || t('stats.na')}` }
       };
     } else {
       return {
@@ -227,9 +229,9 @@ export default function StatsScreen() {
       >
         <View style={styles.cardContentWrapper}>
           <View style={[styles.itemHeader, settings.compactMode && styles.itemHeaderCompact]}>
-            <View>
+            <View style={{ alignItems: 'flex-start' }}>
               <Text style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{item.name}</Text>
-              {aliases.length > 0 && <Text style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>aka: {aliases.join(', ')}</Text>}
+              {aliases.length > 0 && <Text style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>{t('people.aka')} {aliases.join(', ')}</Text>}
             </View>
             {!selectionMode && (
               <TouchableOpacity onPress={() => handleEditClick(item)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
@@ -237,10 +239,10 @@ export default function StatsScreen() {
               </TouchableOpacity>
             )}
           </View>
-          <View style={[styles.itemDetails, settings.compactMode && styles.itemDetailsCompact]}>
-            <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Price: {item.defaultPrice ? `$${item.defaultPrice}` : 'N/A'}</Text>
-            <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Source: {item.source || 'N/A'}</Text>
-            <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>Timing: {item.timing}</Text>
+          <View style={[styles.itemDetails, settings.compactMode && styles.itemDetailsCompact, { alignItems: 'flex-start' }]}>
+            <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>{t('stats.detailsPrice')} {item.defaultPrice ? `$${item.defaultPrice}` : t('stats.na')}</Text>
+            <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>{t('stats.detailsSource')} {item.source || t('stats.na')}</Text>
+            <Text style={[styles.detailText, settings.compactMode && styles.textExtraSmall]}>{t('stats.detailsTiming')} {item.timing || t('stats.na')}</Text>
           </View>
         </View>
 
@@ -269,9 +271,9 @@ export default function StatsScreen() {
       >
         <View style={styles.cardContentWrapper}>
           <View style={[styles.itemHeader, settings.compactMode && styles.itemHeaderCompact]}>
-            <View>
+            <View style={{ alignItems: 'flex-start' }}>
               <Text style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{name}</Text>
-              {aliases.length > 0 && <Text style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>aka: {aliases.join(', ')}</Text>}
+              {aliases.length > 0 && <Text style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>{t('people.aka')} {aliases.join(', ')}</Text>}
             </View>
             {!selectionMode && (
               <TouchableOpacity onPress={() => setEditingStringEntity({ type, name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
@@ -383,27 +385,27 @@ export default function StatsScreen() {
               Keyboard.dismiss();
             }}
           >
-            <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
-            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Search Mode</Text>
+            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('addOrder.exitSearch')}</Text>
           </TouchableOpacity>
         )}
 
         {/* STATISTICS SECTION */}
         {!isSearching && stats && (
           <View>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>📊 App Statistics</Text>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>{t('stats.appStatsTitle')}</Text>
             <View style={[styles.statsCard, settings.compactMode && styles.statsCardCompact]}>
-              <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>Total Money Handled: <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>${stats.totalSpent.toFixed(2)}</Text></Text>
-              <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>Total Orders Created: <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>{stats.totalOrders}</Text></Text>
+              <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>{t('stats.totalHandled')} <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>${stats.totalSpent.toFixed(2)}</Text></Text>
+              <Text style={[styles.statText, settings.compactMode && styles.textSmall]}>{t('stats.totalOrders')} <Text style={[styles.highlight, settings.compactMode && styles.highlightCompact]}>{stats.totalOrders}</Text></Text>
               
-              <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>🏆 Top Spenders</Text>
+              <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>{t('stats.topSpenders')}</Text>
               {stats.topSpenders.map((p, idx) => (
                 <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {p.name} - ${p.total.toFixed(2)}</Text>
               ))}
 
-              <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>🔥 Most Popular Items</Text>
+              <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>{t('stats.topItems')}</Text>
               {stats.topItems.map((i, idx) => (
-                <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {i.name} ({i.qty} ordered)</Text>
+                <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {i.name} ({i.qty} {t('stats.ordered')})</Text>
               ))}
             </View>
             <View style={styles.separator} />
@@ -413,17 +415,20 @@ export default function StatsScreen() {
         {/* DICTIONARY SECTION */}
         {!selectionMode ? (
           <View style={styles.dictionaryHeader}>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>📖 Dictionary</Text>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>{t('stats.dictionaryTitle')}</Text>
             <View style={styles.tabRow}>
-              {(['Items', 'Places', 'Sources'] as const).map(tab => (
-                <TouchableOpacity 
-                  key={tab} 
-                  style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]} 
-                  onPress={() => setActiveTab(tab)}
-                >
-                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive, settings.compactMode && styles.textSmall]}>{tab}</Text>
-                </TouchableOpacity>
-              ))}
+              {(['Items', 'Places', 'Sources'] as const).map(tab => {
+                const tabLabel = tab === 'Items' ? t('stats.tabItems') : tab === 'Places' ? t('stats.tabPlaces') : t('stats.tabSources');
+                return (
+                  <TouchableOpacity 
+                    key={tab} 
+                    style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]} 
+                    onPress={() => setActiveTab(tab)}
+                  >
+                    <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive, settings.compactMode && styles.textSmall]}>{tabLabel}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         ) : (
@@ -432,18 +437,18 @@ export default function StatsScreen() {
               <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedIds(new Set()); }}>
                 <FontAwesome name="times" size={settings.compactMode ? 20 : 24} color="#fff" />
               </TouchableOpacity>
-              <Text style={styles.selectionTitle}>{selectedIds.size} Selected</Text>
+              <Text style={styles.selectionTitle}>{selectedIds.size} {t('run.selected')}</Text>
             </View>
             <View style={styles.headerActions}>
               {selectedIds.size === 2 && (
                 <TouchableOpacity style={[styles.mergeBtn, settings.compactMode && styles.compactBtn]} onPress={() => setMergeModalVisible(true)}>
                   <FontAwesome name="compress" size={settings.compactMode ? 14 : 16} color="#fff" />
-                  <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Merge</Text>
+                  <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>{t('common.edit')}</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={[styles.bulkDeleteBtn, settings.compactMode && styles.compactBtn]} onPress={handleBulkDelete}>
                 <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#fff" />
-                <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>Delete</Text>
+                <Text style={[styles.addBtnText, settings.compactMode && styles.textExtraSmall]}>{t('common.delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -456,23 +461,23 @@ export default function StatsScreen() {
             onChangeText={setSearchQuery}
             onFocus={() => setIsSearching(true)}
             onBlur={() => { if (!searchQuery) setIsSearching(false); }}
-            placeholder={`Search ${activeTab.toLowerCase()}...`}
+            placeholder={t('stats.searchDict', { tab: activeTab === 'Items' ? t('stats.tabItems') : activeTab === 'Places' ? t('stats.tabPlaces') : t('stats.tabSources') })}
             placeholderTextColor="#888"
           />
         </View>
 
         {!isSearching && !selectionMode && (
           <View style={[styles.sortBar, settings.compactMode && styles.sortBarCompact]}>
-            <Text style={[styles.sortLabel, settings.compactMode && styles.textExtraSmall]}>Sort:</Text>
+            <Text style={[styles.sortLabel, settings.compactMode && styles.textExtraSmall]}>{t('stats.sortLabel')}</Text>
             
             <TouchableOpacity 
               style={[styles.sortBtn, (activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'lexical' && styles.sortBtnActive, settings.compactMode && styles.sortBtnCompact]} 
               onPress={() => toggleSort('lexical')}
             >
               <FontAwesome name="sort-alpha-asc" size={settings.compactMode ? 12 : 14} color={(activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'lexical' ? "#fff" : "#888"} />
-              <Text style={[styles.sortBtnText, (activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'lexical' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>A-Z</Text>
+              <Text style={[styles.sortBtnText, (activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'lexical' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>{t('stats.sortAZ')}</Text>
               {(activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'lexical' && (
-                <FontAwesome name={sortOrder === 'asc' ? "caret-up" : "caret-down"} size={10} color="#fff" style={{ marginLeft: 2 }} />
+                <FontAwesome name={sortOrder === 'asc' ? "caret-up" : "caret-down"} size={10} color="#fff" style={{ marginStart: 2 }} />
               )}
             </TouchableOpacity>
 
@@ -482,9 +487,9 @@ export default function StatsScreen() {
                 onPress={() => toggleSort('price')}
               >
                 <FontAwesome name="dollar" size={settings.compactMode ? 12 : 14} color={itemSort === 'price' ? "#fff" : "#888"} />
-                <Text style={[styles.sortBtnText, itemSort === 'price' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Price</Text>
+                <Text style={[styles.sortBtnText, itemSort === 'price' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>{t('stats.sortPrice')}</Text>
                 {itemSort === 'price' && (
-                  <FontAwesome name={sortOrder === 'asc' ? "caret-up" : "caret-down"} size={10} color="#fff" style={{ marginLeft: 2 }} />
+                  <FontAwesome name={sortOrder === 'asc' ? "caret-up" : "caret-down"} size={10} color="#fff" style={{ marginStart: 2 }} />
                 )}
               </TouchableOpacity>
             )}
@@ -494,17 +499,19 @@ export default function StatsScreen() {
               onPress={() => toggleSort('date')}
             >
               <FontAwesome name="clock-o" size={settings.compactMode ? 12 : 14} color={(activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'date' ? "#fff" : "#888"} />
-              <Text style={[styles.sortBtnText, (activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'date' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Added</Text>
+              <Text style={[styles.sortBtnText, (activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'date' && styles.sortBtnTextActive, settings.compactMode && styles.textExtraSmall]}>{t('stats.sortAdded')}</Text>
               {(activeTab === 'Items' ? itemSort : activeTab === 'Places' ? placeSort : sourceSort) === 'date' && (
-                <FontAwesome name={sortOrder === 'asc' ? "caret-up" : "caret-down"} size={10} color="#fff" style={{ marginLeft: 2 }} />
+                <FontAwesome name={sortOrder === 'asc' ? "caret-up" : "caret-down"} size={10} color="#fff" style={{ marginStart: 2 }} />
               )}
             </TouchableOpacity>
           </View>
         )}
 
-        <Text style={[styles.helperText, settings.compactMode && styles.textExtraSmall]}>
-          Long press any item to select, merge, or bulk delete.
-        </Text>
+        {!selectionMode && (
+          <Text style={[styles.helperText, settings.compactMode && styles.textExtraSmall]}>
+            {t('stats.helperText')}
+          </Text>
+        )}
 
         {activeTab === 'Items' && filteredItems.map(renderItemCard)}
         {activeTab === 'Places' && filteredPlaces.map(p => renderStringEntityCard(p, 'Place'))}
@@ -515,8 +522,8 @@ export default function StatsScreen() {
       {editingItem && (
         <CreateItemModal
           visible={!!editingItem}
-          title="Edit Item"
-          submitLabel="Save Changes"
+          title={t('addOrder.editTitle')}
+          submitLabel={t('modals.saveChanges')}
           initialName={editingItem.name}
           initialPrice={editingItem.defaultPrice}
           initialSource={editingItem.source}
@@ -557,10 +564,10 @@ const styles = StyleSheet.create({
   content: { padding: 15 },
   sectionTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 15, color: '#fff' },
   statsCard: { backgroundColor: '#333', padding: 15, borderRadius: 10, marginBottom: 20 },
-  statText: { fontSize: 16, color: '#ccc', marginBottom: 5 },
-  highlight: { color: '#ffeb3b', fontWeight: 'bold', fontSize: 18 },
+  statText: { fontSize: 16, color: '#ccc', marginBottom: 5, textAlign: I18nManager.isRTL ? 'right' : 'left' },
+  highlight: { color: '#ffeb3b', fontWeight: 'bold', fontSize: 18, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   subTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginTop: 15, marginBottom: 10 },
-  listItem: { color: '#ddd', fontSize: 15, marginLeft: 10, marginBottom: 5 },
+  listItem: { color: '#ddd', fontSize: 15, marginStart: 10, marginBottom: 5 },
   separator: { height: 1, backgroundColor: '#555', marginVertical: 20 },
   helperText: { color: '#888', fontSize: 13, textAlign: 'center', marginBottom: 15, fontStyle: 'italic' },
   exitSearchBtn: {
@@ -603,12 +610,12 @@ const styles = StyleSheet.create({
   cardSelected: { borderColor: '#2f95dc', borderWidth: 2, backgroundColor: 'rgba(47, 149, 220, 0.1)' },
   cardContentWrapper: { flex: 1 },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 },
-  itemName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  aliasesText: { fontSize: 12, color: '#aaa', marginTop: 2 },
+  itemName: { fontSize: 18, fontWeight: 'bold', color: '#fff', textAlign: I18nManager.isRTL ? 'right' : 'left' },
+  aliasesText: { fontSize: 12, color: '#aaa', marginTop: 2, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   iconBtn: { padding: 5 },
   itemDetails: { gap: 5 },
-  detailText: { color: '#ccc' },
-  checkboxContainer: { paddingLeft: 15 },
+  detailText: { color: '#ccc', textAlign: I18nManager.isRTL ? 'right' : 'left' },
+  checkboxContainer: { paddingStart: 15 },
   
   // Compact Modifiers
   contentCompact: { padding: 8 },

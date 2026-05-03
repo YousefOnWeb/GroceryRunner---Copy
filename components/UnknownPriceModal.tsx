@@ -3,6 +3,7 @@ import { api } from '@/db/api';
 import React, { useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useTranslation } from '@/utils/i18n';
 
 interface UnknownPriceModalProps {
   visible: boolean;
@@ -18,6 +19,7 @@ export default function UnknownPriceModal({
   onClose,
 }: UnknownPriceModalProps) {
   const [items, setItems] = useState<{ itemName: string; quantity: number; orderDate: string }[]>([]);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (visible && personId) {
@@ -30,14 +32,14 @@ export default function UnknownPriceModal({
       <View style={styles.overlay}>
         <View style={styles.dialog}>
           <View style={styles.header}>
-            <Text style={styles.title}>Notes on {personName}</Text>
+            <Text style={styles.title}>{t('modals.unknownPriceTitle', { name: personName })}</Text>
             <TouchableOpacity onPress={onClose}>
               <FontAwesome name="times" size={24} color="#aaa" />
             </TouchableOpacity>
           </View>
 
           <Text style={styles.subtitle}>
-            They should pay you the price of the following items which we don't know the prices of yet:
+            {t('modals.unknownPriceSubtitle')}
           </Text>
 
           <ScrollView style={styles.list}>
@@ -51,12 +53,12 @@ export default function UnknownPriceModal({
               </View>
             ))}
             {items.length === 0 && (
-              <Text style={styles.emptyText}>No items found.</Text>
+              <Text style={styles.emptyText}>{t('modals.noUnknownItems')}</Text>
             )}
           </ScrollView>
 
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeBtnText}>Got it</Text>
+            <Text style={styles.closeBtnText}>{t('modals.gotIt')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -109,7 +111,7 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#ff9800',
-    marginRight: 10,
+    marginEnd: 10,
   },
   itemText: {
     fontSize: 16,
@@ -119,7 +121,7 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 12,
     color: '#666',
-    marginLeft: 10,
+    marginStart: 10,
   },
   emptyText: {
     color: '#666',

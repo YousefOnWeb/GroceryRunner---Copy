@@ -8,10 +8,11 @@ import { api } from '@/db/api';
 import { items, orderItems, orders, persons } from '@/db/schema';
 import { extractDateValue, formatDateLabel, generateDateOptions, getDefaultDate, getLocalDateString } from '@/utils/dates';
 import { useSettings } from '@/utils/settings';
+import { useTranslation } from '@/utils/i18n';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View as RNView, KeyboardAvoidingView, AppState, Keyboard } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View as RNView, KeyboardAvoidingView, AppState, Keyboard, I18nManager } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 
@@ -40,6 +41,9 @@ export default function TheRunScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const { settings } = useSettings();
+  const { t } = useTranslation();
+
+  const dateOptions = useMemo(() => generateDateOptions(t, t('modals.daysShort')), [t]);
 
   // Force re-render when screen is focused to refresh "Today" labels
   useFocusEffect(
@@ -211,7 +215,7 @@ export default function TheRunScreen() {
       }
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Failed to update item status');
+      Alert.alert(t('common.error'), t('run.failedItemStatus'));
     }
   };
 
@@ -220,7 +224,7 @@ export default function TheRunScreen() {
       await api.markOrderPaid(orderId, personId);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Failed to mark order as paid');
+      Alert.alert(t('common.error'), t('run.failedMarkPaid'));
     }
   };
 
@@ -229,12 +233,12 @@ export default function TheRunScreen() {
       await api.markOrderUnpaid(orderId, personId);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Failed to mark order as unpaid');
+      Alert.alert(t('common.error'), t('run.failedMarkUnpaid'));
     }
   };
 
   const handleCopyRun = async () => {
-    let text = `🛒 RUN SUMMARY: ${formatDateLabel(targetDate)}\n`;
+    let text = `🛒 RUN SUMMARY: ${formatDateLabel(targetDate, t, t('modals.daysShort'))}\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     text += `🛍️ SHOPPING LIST\n`;
@@ -276,24 +280,24 @@ export default function TheRunScreen() {
     });
 
     await Clipboard.setStringAsync(text);
-    Alert.alert('Copied!', 'Run summary copied to clipboard.');
+    Alert.alert(t('run.copiedTitle'), t('run.copiedMsg'));
   };
 
   const handleDeleteOrder = (orderId: string, personName: string) => {
     Alert.alert(
-      'Delete Order',
-      `Are you sure you want to delete the order for ${personName}?`,
+      t('run.deleteOrderTitle'),
+      t('run.deleteOrderConfirm', { name: personName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await api.deleteOrder(orderId);
             } catch (e) {
               console.error(e);
-              Alert.alert('Error', 'Failed to delete order');
+              Alert.alert(t('common.error'), t('run.failedDelete'));
             }
           },
         },
@@ -326,12 +330,12 @@ export default function TheRunScreen() {
 
   const handleDeleteSelected = () => {
     Alert.alert(
-      'Delete Selected',
-      `Are you sure you want to delete ${selectedOrders.size} order(s)?`,
+      t('run.deleteSelectedTitle'),
+      t('run.deleteSelectedBody', { count: selectedOrders.size }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -342,7 +346,7 @@ export default function TheRunScreen() {
               setSelectedOrders(new Set());
             } catch (e) {
               console.error(e);
-              Alert.alert('Error', 'Failed to delete selected orders');
+              Alert.alert(t('common.error'), t('run.failedDelete'));
             }
           },
         },
@@ -358,10 +362,10 @@ export default function TheRunScreen() {
         await api.moveOrdersToDate(Array.from(selectedOrders), newDateStr);
         setSelectionMode(false);
         setSelectedOrders(new Set());
-        Alert.alert('Success', `Moved ${selectedOrders.size} order(s) to ${formatDateLabel(selectedDate)}`);
+        Alert.alert(t('common.success'), t('run.movedOrders', { count: selectedOrders.size, date: formatDateLabel(selectedDate, t, t('modals.daysShort')) }));
       } catch (e) {
         console.error(e);
-        Alert.alert('Error', 'Failed to move orders');
+        Alert.alert(t('common.error'), t('run.failedMove'));
       }
     }
   };
@@ -397,17 +401,17 @@ export default function TheRunScreen() {
       <View style={[styles.header, settings.compactMode && styles.headerCompact, { zIndex: 10 }]}>
         {!selectionMode ? (
           <View style={styles.headerLeft}>
-            <Text style={[styles.headerTitle, settings.compactMode && styles.textSmall]}>Run:</Text>
+            <Text style={[styles.headerTitle, settings.compactMode && styles.textSmall]}>{t('run.runLabel')}</Text>
             <View style={styles.dateNavRow}>
               <TouchableOpacity onPress={handlePrevDay} style={[styles.navBtn, settings.compactMode && styles.paddingSmall]}>
-                <FontAwesome name="chevron-left" size={settings.compactMode ? 14 : 16} color="#888" />
+                <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 14 : 16} color="#888" />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
-                <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate)}</Text>
+                <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate, t, t('modals.daysShort'))}</Text>
                 <FontAwesome name="calendar" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleNextDay} style={[styles.navBtn, settings.compactMode && styles.paddingSmall]}>
-                <FontAwesome name="chevron-right" size={settings.compactMode ? 14 : 16} color="#888" />
+                <FontAwesome name={I18nManager.isRTL ? "chevron-left" : "chevron-right"} size={settings.compactMode ? 14 : 16} color="#888" />
               </TouchableOpacity>
             </View>
           </View>
@@ -416,8 +420,8 @@ export default function TheRunScreen() {
             <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedOrders(new Set()); }} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
               <FontAwesome name="times" size={settings.compactMode ? 18 : 20} color="#888" />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, settings.compactMode && styles.textSmall]}>{selectedOrders.size} Selected</Text>
-            <TouchableOpacity onPress={() => setShowMoveDatePicker(true)} style={[styles.copyBtn, { marginLeft: 10 }, settings.compactMode && styles.paddingSmall]}>
+            <Text style={[styles.headerTitle, settings.compactMode && styles.textSmall]}>{selectedOrders.size} {t('run.selected')}</Text>
+            <TouchableOpacity onPress={() => setShowMoveDatePicker(true)} style={[styles.copyBtn, { marginStart: 10 }, settings.compactMode && styles.paddingSmall]}>
               <FontAwesome name="calendar" size={settings.compactMode ? 18 : 20} color="#2f95dc" />
             </TouchableOpacity>
             <TouchableOpacity onPress={handleDeleteSelected} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
@@ -464,16 +468,16 @@ export default function TheRunScreen() {
               Keyboard.dismiss();
             }}
           >
-            <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
-            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Search Mode</Text>
+            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('run.exitSearch')}</Text>
           </TouchableOpacity>
         )}
 
         {!isSearching && (
           <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>🛍️ The Shopping List</Text>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>{t('run.shoppingList')}</Text>
             {listTotal > 0 && (
-              <Text style={[styles.sectionTotal, settings.compactMode && styles.textSmall]}>Total: ${listTotal.toFixed(2)}</Text>
+              <Text style={[styles.sectionTotal, settings.compactMode && styles.textSmall]}>{t('run.total')} ${listTotal.toFixed(2)}</Text>
             )}
           </View>
         )}
@@ -516,14 +520,16 @@ export default function TheRunScreen() {
                         size={settings.compactMode ? 20 : 24}
                         color={checkedItems[ag.item.id] ? '#28a745' : '#ccc'}
                       />
-                      <Text
-                        style={[
-                          styles.itemText,
-                          settings.compactMode && styles.itemTextCompact,
-                          checkedItems[ag.item.id] && styles.itemTextCrossed,
-                        ]}>
-                        {ag.totalQuantity}x {ag.item.name}
-                      </Text>
+                      <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                        <Text
+                          style={[
+                            styles.itemText,
+                            settings.compactMode && styles.itemTextCompact,
+                            checkedItems[ag.item.id] && styles.itemTextCrossed,
+                          ]}>
+                          {ag.totalQuantity}x {ag.item.name}
+                        </Text>
+                      </View>
                       {ag.totalCost > 0 && (
                         <Text style={[
                           styles.itemPrice,
@@ -544,14 +550,14 @@ export default function TheRunScreen() {
         {!isSearching && <View style={styles.separator} />}
 
         <View style={[styles.deliveriesHeader, settings.compactMode && styles.deliveriesHeaderCompact]}>
-          <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>🚚 Deliveries & Payments</Text>
+          <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>{t('run.deliveries')}</Text>
           <TextInput
             style={[styles.searchInput, settings.compactMode && styles.searchInputCompact]}
             value={searchQuery}
             onChangeText={setSearchQuery}
             onFocus={() => setIsSearching(true)}
             onBlur={() => { if (!searchQuery) setIsSearching(false); }}
-            placeholder="Search person or location..."
+            placeholder={t('run.searchPerson')}
             placeholderTextColor="#888"
           />
         </View>
@@ -610,13 +616,13 @@ export default function TheRunScreen() {
                           name={selectedOrders.has(po.order.id) ? 'check-square-o' : 'square-o'} 
                           size={settings.compactMode ? 20 : 24} 
                           color={selectedOrders.has(po.order.id) ? '#2f95dc' : '#888'} 
-                          style={{ marginRight: 10 }} 
+                          style={{ marginEnd: 10 }} 
                         />
                       )}
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.personName, settings.compactMode && styles.personNameCompact]}>{po.person.name}</Text>
+                      <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                        <Text style={[styles.personName, settings.compactMode && styles.personNameCompact, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>{po.person.name}</Text>
                         {po.deliveryPlace ? (
-                          <Text style={[styles.deliveryPlace, settings.compactMode && styles.textExtraSmall]}>📍 {po.deliveryPlace}</Text>
+                          <Text style={[styles.deliveryPlace, settings.compactMode && styles.textExtraSmall, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>📍 {po.deliveryPlace}</Text>
                         ) : null}
                       </View>
                     </View>
@@ -628,11 +634,11 @@ export default function TheRunScreen() {
                           </TouchableOpacity>
                         )}
                         <Text style={[styles.personTotal, settings.compactMode && styles.personTotalCompact]}>
-                          ${po.totalCost.toFixed(2)}{po.hasUnknownPriceItems ? ' + TBD' : ''}
+                          ${po.totalCost.toFixed(2)}{po.hasUnknownPriceItems ? ` + ${t('common.priceTBD')}` : ''}
                         </Text>
                       </View>
                       {po.unpaidCost > 0 && (
-                        <Text style={[styles.unpaidCost, settings.compactMode && styles.textExtraSmall]}>(${po.unpaidCost.toFixed(2)} unpaid)</Text>
+                        <Text style={[styles.unpaidCost, settings.compactMode && styles.textExtraSmall]}>(${po.unpaidCost.toFixed(2)} {t('run.unpaid')})</Text>
                       )}
                     </View>
                   </TouchableOpacity>
@@ -651,9 +657,9 @@ export default function TheRunScreen() {
                               color={i.isPaid ? '#28a745' : '#ccc'}
                             />
                           </TouchableOpacity>
-                          <View style={styles.itemInfo}>
+                          <View style={[styles.itemInfo, { alignItems: 'flex-start' }]}>
                             <Text style={[styles.personItemText, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid]}>
-                              {i.quantity}x {i.itemDef?.name} - {i.unitPrice === null ? 'Price TBD' : `$${itemCost.toFixed(2)}`}
+                              {i.quantity}x {i.itemDef?.name} - {i.unitPrice === null ? t('common.priceTBD') : `$${itemCost.toFixed(2)}`}
                             </Text>
                           </View>
                         </View>
@@ -666,12 +672,12 @@ export default function TheRunScreen() {
                       <View style={styles.balanceHeaderRow}>
                         <Text style={[styles.balanceLabel, settings.compactMode && styles.textExtraSmall, po.person.balance < 0 ? styles.debtLabel : po.person.balance > 0 ? styles.creditLabel : po.hasUnknownPriceItems ? styles.pendingLabel : styles.settledLabel]}>
                           {po.person.balance < 0
-                            ? 'Your money with them: '
+                            ? t('run.debtLabel')
                             : po.person.balance > 0
-                            ? 'Their money with you: '
+                            ? t('run.creditLabel')
                             : po.hasUnknownPriceItems
-                            ? 'Awaiting Prices: '
-                            : 'Settled: '}
+                            ? t('run.pendingLabel')
+                            : t('run.settledLabel')}
                         </Text>
                         {po.hasUnknownPriceItems && (
                           <TouchableOpacity
@@ -698,13 +704,13 @@ export default function TheRunScreen() {
                         <TouchableOpacity
                           style={[styles.markAllPaidBtn, settings.compactMode && styles.compactBtn]}
                           onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
-                          <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>Mark All Paid</Text>
+                          <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markAllPaid')}</Text>
                         </TouchableOpacity>
                       ) : (
                         <TouchableOpacity
                           style={[styles.markAllUnpaidBtn, settings.compactMode && styles.compactBtn]}
                           onPress={() => handleMarkAllUnpaid(po.order.id, po.person.id)}>
-                          <Text style={[styles.markAllUnpaidText, settings.compactMode && styles.textExtraSmall]}>Mark All Unpaid</Text>
+                          <Text style={[styles.markAllUnpaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markAllUnpaid')}</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -714,6 +720,12 @@ export default function TheRunScreen() {
             </View>
           );
         })}
+
+        {peopleOrders.length === 0 && !isSearching && (
+          <Text style={[styles.emptyText, settings.compactMode && styles.textSmall, { textAlign: 'center', marginTop: 20 }]}>
+            {t('run.noDeliveries')}
+          </Text>
+        )}
 
         {(() => {
           const q = searchQuery.toLowerCase().trim();
@@ -730,7 +742,7 @@ export default function TheRunScreen() {
             return (
               <View style={styles.noResultsContainer}>
                 <FontAwesome name="search" size={48} color="#444" style={{ marginBottom: 10 }} />
-                <Text style={styles.noResultsText}>No orders found matching "{searchQuery}"</Text>
+                <Text style={styles.noResultsText}>{t('run.noOrdersFound', { query: searchQuery })}</Text>
               </View>
             );
           }
@@ -781,7 +793,7 @@ const styles = StyleSheet.create({
   },
   dateDisplayText: { color: '#fff', fontSize: 14, fontWeight: '500' },
   headerTitle: { fontSize: 16, color: '#fff' },
-  copyBtn: { padding: 10, marginLeft: 5 },
+  copyBtn: { padding: 10, marginStart: 5 },
   dateNavRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   navBtn: { padding: 8 },
   content: { padding: 15 },
@@ -801,11 +813,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   locationGroup: { marginBottom: 25 },
-  locationHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginLeft: 5 },
-  deliveryLocationTitle: { fontSize: 18, fontWeight: 'bold', color: '#8bb8e8', marginLeft: 5 },
+  locationHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginStart: 5 },
+  deliveryLocationTitle: { fontSize: 18, fontWeight: 'bold', color: '#8bb8e8', marginStart: 5 },
   timingGroup: { marginBottom: 15 },
   timingTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginBottom: 5 },
-  sourceGroup: { marginLeft: 10, marginBottom: 12 },
+  sourceGroup: { marginStart: 10, marginBottom: 12 },
   sourceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -832,18 +844,18 @@ const styles = StyleSheet.create({
   sourceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   sourceTitle: { fontSize: 16, color: '#aaa' },
   sourceCost: { fontSize: 16, fontWeight: 'bold', color: '#ffeb3b' },
-  itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginLeft: 10 },
-  itemText: { fontSize: 18, color: '#fff', marginLeft: 10, flex: 1 },
-  itemPrice: { fontSize: 14, color: '#aaa', marginLeft: 8 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginStart: 10 },
+  itemText: { fontSize: 18, color: '#fff', marginStart: 10 },
+  itemPrice: { fontSize: 14, color: '#aaa', marginStart: 8 },
   itemTextCrossed: { textDecorationLine: 'line-through', color: '#666' },
   emptyText: { color: '#888', fontStyle: 'italic', marginBottom: 20 },
   separator: { height: 1, backgroundColor: '#444', marginVertical: 20 },
   personCard: { backgroundColor: '#222', padding: 15, borderRadius: 10, marginBottom: 15 },
   personHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  personName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  personTotal: { fontSize: 18, fontWeight: 'bold', color: '#ffeb3b' },
-  deliveryPlace: { fontSize: 12, color: '#8bb8e8', marginTop: 2 },
-  costInfo: { alignItems: 'flex-end' },
+  personName: { fontSize: 18, fontWeight: 'bold', color: '#fff', textAlign: I18nManager.isRTL ? 'right' : 'left' },
+  personTotal: { fontSize: 18, fontWeight: 'bold', color: '#ffeb3b', textAlign: I18nManager.isRTL ? 'left' : 'right' },
+  deliveryPlace: { fontSize: 12, color: '#8bb8e8', marginTop: 2, textAlign: I18nManager.isRTL ? 'right' : 'left' },
+  costInfo: { alignItems: 'flex-end', flex: 1 },
   orderActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   deleteOrderBtn: { padding: 4 },
   unpaidCost: { fontSize: 12, color: '#ff9800', fontWeight: 'bold' },
@@ -851,7 +863,7 @@ const styles = StyleSheet.create({
   itemRow2: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   itemToggle: { padding: 8 },
   itemInfo: { flex: 1 },
-  personItemText: { color: '#ccc', fontSize: 14 },
+  personItemText: { color: '#ccc', fontSize: 14, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   personItemPaid: { textDecorationLine: 'line-through', color: '#666' },
   personFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#555', paddingTop: 10 },
   balanceHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -867,7 +879,7 @@ const styles = StyleSheet.create({
   credit: { color: '#00C851', fontWeight: 'bold', fontSize: 16 },
   pending: { color: '#ff9800', fontWeight: 'bold', fontSize: 16 },
   settled: { color: '#aaa', fontWeight: 'bold', fontSize: 16 },
-  buttonGroup: { alignItems: 'flex-end' },
+  buttonGroup: { alignItems: 'flex-end', flex: 1 },
   markAllPaidBtn: { backgroundColor: '#2f95dc', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
   markAllPaidText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
   markAllUnpaidBtn: { backgroundColor: '#444', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
@@ -879,7 +891,7 @@ const styles = StyleSheet.create({
   contentCompact: { padding: 8 },
   sectionTitleCompact: { fontSize: 18, marginBottom: 5 },
   timingTitleCompact: { fontSize: 15, marginBottom: 3 },
-  sourceGroupCompact: { marginBottom: 8, marginLeft: 5 },
+  sourceGroupCompact: { marginBottom: 8, marginStart: 5 },
   sourceHeaderCompact: { paddingVertical: 2 },
   itemRowCompact: { marginBottom: 4 },
   itemTextCompact: { fontSize: 15 },

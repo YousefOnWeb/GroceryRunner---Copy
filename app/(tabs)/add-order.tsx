@@ -10,8 +10,9 @@ import { extractDateValue, formatDateLabel, getDefaultDate, getLocalDateString }
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard, I18nManager } from 'react-native';
 import { useSettings } from '@/utils/settings';
+import { useTranslation } from '@/utils/i18n';
 import SmartTextInput from '@/components/SmartTextInput';
 import { COMMON_GROCERY_CORPUS, COMMON_NAMES_CORPUS } from '@/utils/textMatching';
 
@@ -22,7 +23,9 @@ export default function AddOrderScreen() {
   const { data: itemAliasesList } = useLiveQuery(db.select().from(itemAliases));
   const { data: allOrders } = useLiveQuery(db.select().from(orders));
   const { data: allOrderItems } = useLiveQuery(db.select().from(orderItems));
+  const [refreshKey, setRefreshKey] = useState(0);
   const { settings } = useSettings();
+  const { t } = useTranslation();
 
   const [targetDate, setTargetDate] = useState(getDefaultDate());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -121,17 +124,17 @@ export default function AddOrderScreen() {
 
   const handleSaveOrder = async () => {
     if (!selectedPersonId) {
-      Alert.alert('Error', 'Please select a person');
+      Alert.alert(t('common.error'), t('addOrder.errorNoPerson'));
       return;
     }
     
     if (existingOrder && editModeOrderId !== existingOrder.id) {
-      Alert.alert('Cannot Add', 'This person already has an order for this date.');
+      Alert.alert(t('common.error'), t('addOrder.errorExists'));
       return;
     }
 
     if (cart.length === 0 && !editModeOrderId) {
-      Alert.alert('Error', 'Cart is empty');
+      Alert.alert(t('common.error'), t('addOrder.errorEmptyCart'));
       return;
     }
 
@@ -144,10 +147,10 @@ export default function AddOrderScreen() {
 
       if (editModeOrderId) {
         await api.updateOrder(editModeOrderId, selectedPersonId, orderLines, deliveryPlace || null);
-        Alert.alert('Success', 'Order updated successfully');
+        Alert.alert(t('common.success'), t('addOrder.successUpdate'));
       } else {
         await api.createOrder(selectedPersonId, targetDateDb, orderLines, deliveryPlace || null);
-        Alert.alert('Success', 'Order saved successfully');
+        Alert.alert(t('common.success'), t('addOrder.successSave'));
       }
       
       setCart([]);
@@ -157,7 +160,7 @@ export default function AddOrderScreen() {
       setDeliveryPlace('');
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Failed to save order');
+      Alert.alert(t('common.error'), t('addOrder.errorSave'));
     }
   };
 
@@ -170,7 +173,7 @@ export default function AddOrderScreen() {
         setSearchQuery('');
       }
     } catch (e) {
-      Alert.alert('Error', 'Failed to create item');
+      Alert.alert(t('common.error'), t('addOrder.errorCreateItem'));
     }
   };
 
@@ -262,14 +265,14 @@ export default function AddOrderScreen() {
               Keyboard.dismiss();
             }}
           >
-            <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
-            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Search Mode</Text>
+            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('addOrder.exitSearch')}</Text>
           </TouchableOpacity>
         )}
 
         {(!activeSearch || activeSearch === 'person') && (
           <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>1. Who is this for?</Text>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>{t('addOrder.step1Title')}</Text>
             <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
               <SmartTextInput
                 style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
@@ -277,14 +280,14 @@ export default function AddOrderScreen() {
                 onChangeText={setPersonSearchQuery}
                 onFocus={() => setActiveSearch('person')}
                 onBlur={handleBlur}
-                placeholder="Search person..."
+                placeholder={t('addOrder.searchPersonPlaceholder')}
                 placeholderTextColor="#888"
                 corpus={personCorpus}
                 compactMode={settings.compactMode}
               />
               {personSearchQuery.trim().length > 0 && !exactPersonMatch && (
                 <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setPersonModalVisible(true)}>
-                  <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>Add</Text>
+                  <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>{t('addOrder.addBtn')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -309,7 +312,7 @@ export default function AddOrderScreen() {
               <View style={[styles.selectedRow, settings.compactMode && styles.selectedRowCompact]}>
                 <Text style={[styles.selectedText, settings.compactMode && styles.textSmall]}>{selectedPerson.name}</Text>
                 <TouchableOpacity onPress={() => { setSelectedPersonId(null); setPersonSearchQuery(''); }}>
-                  <Text style={[styles.changeBtnText, settings.compactMode && styles.textExtraSmall]}>Change</Text>
+                  <Text style={[styles.changeBtnText, settings.compactMode && styles.textExtraSmall]}>{t('addOrder.changeBtn')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -318,9 +321,9 @@ export default function AddOrderScreen() {
 
         {!activeSearch && (
           <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>2. When?</Text>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>{t('addOrder.step2Title')}</Text>
             <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
-              <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate)}</Text>
+              <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate, t, t('modals.daysShort'))}</Text>
               <FontAwesome name="calendar" size={16} color="#2f95dc" />
             </TouchableOpacity>
           </View>
@@ -330,14 +333,14 @@ export default function AddOrderScreen() {
 
         {selectedPersonId && (!activeSearch || activeSearch === 'place') && (
           <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>📍 Deliver to</Text>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>{t('addOrder.stepDeliverToTitle')}</Text>
             <TextInput
               style={[styles.input, settings.compactMode && styles.inputCompact]}
               value={deliveryPlace}
               onChangeText={setDeliveryPlace}
               onFocus={() => setActiveSearch('place')}
               onBlur={handleBlur}
-              placeholder="e.g. Building A"
+              placeholder={t('addOrder.deliveryPlaceholder')}
               placeholderTextColor="#888"
             />
             {activeSearch === 'place' && filteredPlaces.length > 0 && (
@@ -354,14 +357,14 @@ export default function AddOrderScreen() {
 
         {!activeSearch && existingOrder && editModeOrderId !== existingOrder.id && (
           <View style={styles.warningBanner}>
-            <Text style={styles.warningText}>⚠️ Order exists.</Text>
-            <TouchableOpacity style={styles.loadBtn} onPress={loadExistingOrder}><Text style={styles.loadBtnText}>Edit</Text></TouchableOpacity>
+            <Text style={styles.warningText}>{t('addOrder.warningExists')}</Text>
+            <TouchableOpacity style={styles.loadBtn} onPress={loadExistingOrder}><Text style={styles.loadBtnText}>{t('addOrder.editBtn')}</Text></TouchableOpacity>
           </View>
         )}
 
         {(!activeSearch || activeSearch === 'item') && (
           <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>3. Items</Text>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>{t('addOrder.step3Title')}</Text>
             <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
               <SmartTextInput
                 style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
@@ -369,14 +372,14 @@ export default function AddOrderScreen() {
                 onChangeText={setSearchQuery}
                 onFocus={() => setActiveSearch('item')}
                 onBlur={handleBlur}
-                placeholder="Search items..."
+                placeholder={t('addOrder.searchItemsPlaceholder')}
                 placeholderTextColor="#888"
                 corpus={itemCorpus}
                 compactMode={settings.compactMode}
               />
               {searchQuery.trim().length > 0 && !exactItemMatch && (
                 <TouchableOpacity style={[styles.addButton, settings.compactMode && styles.addButtonCompact]} onPress={() => setItemModalVisible(true)}>
-                  <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>Add</Text>
+                  <Text style={[styles.addButtonText, settings.compactMode && styles.textExtraSmall]}>{t('addOrder.addBtn')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -396,7 +399,7 @@ export default function AddOrderScreen() {
 
         {!activeSearch && cart.length > 0 && (
           <View style={[styles.section, settings.compactMode && styles.sectionCompact]}>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>Cart</Text>
+            <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>{t('addOrder.cartTitle')}</Text>
             {cart.map((c) => (
               <View key={c.item.id} style={[styles.cartRow, settings.compactMode && styles.cartRowCompact]}>
                 <Text style={[styles.cartText, settings.compactMode && styles.textSmall]}>{c.item.name}</Text>
@@ -421,7 +424,7 @@ export default function AddOrderScreen() {
           onPress={handleSaveOrder}
         >
           <Text style={[styles.saveButtonText, settings.compactMode && styles.textSmall]}>
-            {editModeOrderId ? 'Save Edit' : 'Save Order'}
+            {editModeOrderId ? t('addOrder.saveEdit') : t('addOrder.saveOrder')}
           </Text>
         </TouchableOpacity>
       )}
@@ -439,22 +442,22 @@ const styles = StyleSheet.create({
   selectedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#333', padding: 12, borderRadius: 8 },
   selectedText: { color: '#2f95dc', fontSize: 18, fontWeight: 'bold' },
   changeBtnText: { color: '#aaa', fontSize: 14 },
-  input: { backgroundColor: '#333', color: '#fff', padding: 12, borderRadius: 8, fontSize: 16, marginBottom: 10 },
+  input: { backgroundColor: '#333', color: '#fff', padding: 12, borderRadius: 8, fontSize: 16, marginBottom: 10, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  addButton: { marginLeft: 10, backgroundColor: '#2f95dc', padding: 12, borderRadius: 8 },
+  addButton: { marginStart: 10, backgroundColor: '#2f95dc', padding: 12, borderRadius: 8 },
   addButtonText: { color: '#fff', fontWeight: 'bold' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   gridItem: { backgroundColor: '#444', padding: 15, borderRadius: 10, minWidth: '30%' },
   gridItemPerson: { backgroundColor: '#444', padding: 10, borderRadius: 20 },
   gridItemName: { color: '#fff', textAlign: 'center' },
-  badge: { position: 'absolute', top: -5, right: -5, backgroundColor: '#ff4444', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  badge: { position: 'absolute', top: -5, end: -5, backgroundColor: '#ff4444', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   cartRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  cartText: { fontSize: 16, color: '#fff' },
+  cartText: { fontSize: 16, color: '#fff', textAlign: I18nManager.isRTL ? 'right' : 'left' },
   cartActions: { flexDirection: 'row', alignItems: 'center' },
   cartBtn: { backgroundColor: '#ccc', padding: 8, borderRadius: 15 },
   cartQuantity: { marginHorizontal: 15, fontSize: 18, color: '#fff' },
   saveButton: { backgroundColor: '#28a745', padding: 20, alignItems: 'center', margin: 15, borderRadius: 10 },
-  saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
   warningBanner: { backgroundColor: '#4a2f00', padding: 15, marginHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: '#ff9800' },
   warningText: { color: '#fff', marginBottom: 10 },
   loadBtn: { backgroundColor: '#ff9800', padding: 10, borderRadius: 5, alignItems: 'center' },
@@ -475,7 +478,7 @@ const styles = StyleSheet.create({
   gridCompact: { gap: 6 },
   gridItemCompact: { padding: 10 },
   gridItemPersonCompact: { padding: 6 },
-  badgeCompact: { width: 18, height: 18, top: -4, right: -4 },
+  badgeCompact: { width: 18, height: 18, top: -4, end: -4 },
   dateDisplayCompact: { padding: 8 },
   cartRowCompact: { marginBottom: 6 },
   cartBtnCompact: { padding: 5, borderRadius: 10 },

@@ -5,20 +5,21 @@ export function getLocalDateString(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-export function generateDateOptions(days: number = 14) {
+export function generateDateOptions(t: (key: string) => string, daysShort: string, days: number = 14) {
   const options: string[] = [];
   const today = new Date();
+  const weekdays = daysShort.split(',');
   
   for (let i = 0; i < days; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     
     const value = getLocalDateString(d);
-    const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const weekday = weekdays[d.getDay()];
     let label = `${value} (${weekday})`;
     
-    if (i === 0) label = `Today - ${label}`;
-    if (i === 1) label = `Tomorrow - ${label}`;
+    if (i === 0) label = `${t('common.today')} - ${label}`;
+    if (i === 1) label = `${t('common.tomorrow')} - ${label}`;
     
     options.push(label);
   }
@@ -42,9 +43,10 @@ export function getDefaultDate() {
   return target;
 }
 
-export function formatDateLabel(date: Date) {
+export function formatDateLabel(date: Date, t: (key: string) => string, daysShort: string) {
   const value = getLocalDateString(date);
-  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+  const weekdays = daysShort.split(',');
+  const weekday = weekdays[date.getDay()];
   
   const today = new Date();
   const todayStr = getLocalDateString(today);
@@ -54,8 +56,8 @@ export function formatDateLabel(date: Date) {
   const tomorrowStr = getLocalDateString(tomorrow);
   
   let label = `${value} (${weekday})`;
-  if (value === todayStr) label = `Today - ${label}`;
-  else if (value === tomorrowStr) label = `Tomorrow - ${label}`;
+  if (value === todayStr) label = `${t('common.today')} - ${label}`;
+  else if (value === tomorrowStr) label = `${t('common.tomorrow')} - ${label}`;
   
   return label;
 }

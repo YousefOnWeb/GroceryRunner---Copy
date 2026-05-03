@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Modal, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
+import { StyleSheet, Modal, TouchableOpacity, Switch, ActivityIndicator, I18nManager } from 'react-native';
 import { Text, View } from './Themed';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useTranslation } from '@/utils/i18n';
 
 interface Entity {
   id: string;
@@ -22,6 +23,7 @@ export default function MergeModal({ visible, entityA, entityB, entityType, onCl
   const [primaryId, setPrimaryId] = useState<string>('');
   const [keepAsAlias, setKeepAsAlias] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { t } = useTranslation();
 
   // Default primary to A
   useEffect(() => {
@@ -60,19 +62,19 @@ export default function MergeModal({ visible, entityA, entityB, entityType, onCl
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>Merge {entityType}s</Text>
+            <Text style={styles.title}>{t('modals.mergeTitle', { type: t(`modals.${entityType.toLowerCase()}`) })}</Text>
             <TouchableOpacity onPress={onClose} disabled={isSubmitting}>
               <FontAwesome name="times" size={24} color="#888" />
             </TouchableOpacity>
           </View>
 
           <Text style={styles.description}>
-            This will combine these two {entityType.toLowerCase()}s into one. All orders, balances, and history belonging to the secondary {entityType.toLowerCase()} will be transferred to the primary.
+            {t('modals.mergeDesc', { type: t(`modals.${entityType.toLowerCase()}`) })}
           </Text>
 
           <View style={styles.swapContainer}>
             <View style={[styles.entityBox, styles.primaryBox]}>
-              <Text style={styles.roleLabel}>Primary (Kept)</Text>
+              <Text style={styles.roleLabel}>{t('modals.primaryLabel')}</Text>
               <Text style={styles.entityName}>{primary.name}</Text>
               {primary.details && <Text style={styles.entityDetails}>{primary.details}</Text>}
             </View>
@@ -82,14 +84,14 @@ export default function MergeModal({ visible, entityA, entityB, entityType, onCl
             </TouchableOpacity>
 
             <View style={[styles.entityBox, styles.secondaryBox]}>
-              <Text style={styles.roleLabel}>Secondary (Merged)</Text>
+              <Text style={styles.roleLabel}>{t('modals.secondaryLabel')}</Text>
               <Text style={[styles.entityName, styles.strikethrough]}>{secondary.name}</Text>
               {secondary.details && <Text style={styles.entityDetails}>{secondary.details}</Text>}
             </View>
           </View>
 
           <View style={styles.optionRow}>
-            <Text style={styles.optionLabel}>Keep "{secondary.name}" as an alias for "{primary.name}"?</Text>
+            <Text style={styles.optionLabel}>{t('modals.keepAsAlias', { secondary: secondary.name, primary: primary.name })}</Text>
             <Switch
               value={keepAsAlias}
               onValueChange={setKeepAsAlias}
@@ -101,13 +103,13 @@ export default function MergeModal({ visible, entityA, entityB, entityType, onCl
 
           <View style={styles.actions}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={isSubmitting}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.mergeBtn} onPress={handleMerge} disabled={isSubmitting}>
               {isSubmitting ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.mergeText}>Confirm Merge</Text>
+                <Text style={styles.mergeText}>{t('modals.confirmMerge')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -141,6 +143,8 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 20,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   description: {
     color: '#ccc',
@@ -209,7 +213,7 @@ const styles = StyleSheet.create({
   optionLabel: {
     color: '#fff',
     flex: 1,
-    marginRight: 15,
+    marginEnd: 15,
     fontSize: 14,
   },
   actions: {

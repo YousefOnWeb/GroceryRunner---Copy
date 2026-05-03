@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { TextInput, TextInputProps, View, StyleSheet, TouchableOpacity, StyleProp, ViewStyle, Platform, UIManager } from 'react-native';
+import { TextInput, TextInputProps, View, StyleSheet, TouchableOpacity, StyleProp, ViewStyle, Platform, UIManager, I18nManager } from 'react-native';
 import { Text } from './Themed';
 import { findSmartSuggestion } from '@/utils/textMatching';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginTop: -8, // Pull it slightly up to sit snugly under the input
     marginBottom: 8,
-    marginLeft: 4,
+    marginStart: 4,
   },
   suggestionBubbleCompact: {
     paddingHorizontal: 8,
@@ -98,11 +98,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   icon: {
-    marginRight: 6,
+    marginEnd: 6,
   },
   suggestionText: {
     color: '#ccc',
-    fontSize: 13,
+    fontSize: 12,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   suggestionHighlight: {
     color: '#f0ad4e',

@@ -1,7 +1,7 @@
 import { Text } from '@/components/Themed';
 import { api } from '@/db/api';
 import React, { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Alert, Keyboard } from 'react-native';
+import { Alert, I18nManager, Keyboard, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import DropdownSelect from './DropdownSelect';
 import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
@@ -10,6 +10,7 @@ import { COMMON_GROCERY_CORPUS } from '@/utils/textMatching';
 import { db } from '@/db';
 import { items } from '@/db/schema';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { useTranslation } from '@/utils/i18n';
 
 const EMPTY_ARRAY: any[] = [];
 
@@ -51,6 +52,7 @@ export default function CreateItemModal({
   const [activeFocus, setActiveFocus] = useState<string | null>(null);
   const [itemCorpus, setItemCorpus] = useState<string[]>(COMMON_GROCERY_CORPUS);
   const { settings } = useSettings();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (visible) {
@@ -125,8 +127,8 @@ export default function CreateItemModal({
 
   const showPriceHelp = () => {
     Alert.alert(
-      'Price Update Modes',
-      '• Market Change (Default): Only sets the price for new orders. Past orders stay the same (except those that had no price set).\n\n• Price Correction: Updates this price in ALL past orders. Useful for fixing mistakes. This will also adjust people\'s current balances accordingly.'
+      t('modals.priceUpdateHelpTitle'),
+      t('modals.priceUpdateHelpMsg')
     );
   };
 
@@ -146,21 +148,21 @@ export default function CreateItemModal({
                 Keyboard.dismiss();
               }}
             >
-              <FontAwesome name="chevron-left" size={settings.compactMode ? 12 : 14} color="#2f95dc" />
-              <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>Exit Focus Mode</Text>
+              <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+              <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('common.exitFocusMode')}</Text>
             </TouchableOpacity>
           )}
 
           {(!activeFocus || activeFocus === 'name') && (
             <>
-              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Item Name *</Text>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>{t('modals.itemNameLabel')}</Text>
               <SmartTextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
                 onFocus={() => setActiveFocus('name')}
                 onBlur={() => { if (!name) setActiveFocus(null); }}
-                placeholder="e.g. Milk, Bread, Apples"
+                placeholder={t('modals.itemNamePlaceholder')}
                 placeholderTextColor="#888"
                 autoFocus={!isEditMode}
                 corpus={itemCorpus}
@@ -171,7 +173,7 @@ export default function CreateItemModal({
 
           {!activeFocus && (
             <>
-              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Default Price (optional)</Text>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>{t('modals.defaultPriceLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={priceStr}
@@ -185,7 +187,7 @@ export default function CreateItemModal({
 
           {(!activeFocus || activeFocus === 'source') && (
             <>
-              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Usual Source</Text>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>{t('modals.usualSourceLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={sourceSearch || source}
@@ -203,7 +205,7 @@ export default function CreateItemModal({
                     if (!sourceSearch) setActiveFocus(null);
                   }, 150);
                 }}
-                placeholder="e.g. Walmart, Local Market"
+                placeholder={t('modals.usualSourcePlaceholder')}
                 placeholderTextColor="#888"
               />
               
@@ -227,8 +229,8 @@ export default function CreateItemModal({
 
           {(!activeFocus || activeFocus === 'aliases') && (
             <>
-              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Aliases / Nicknames</Text>
-              <Text style={styles.hint}>Help recognition when typing different names.</Text>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>{t('modals.aliasesLabel')}</Text>
+              <Text style={styles.hint}>{t('modals.aliasesHint')}</Text>
               
               <View style={styles.aliasList}>
                 {aliases.map((alias, idx) => (
@@ -248,7 +250,7 @@ export default function CreateItemModal({
                   onChangeText={setNewAlias}
                   onFocus={() => setActiveFocus('aliases')}
                   onBlur={() => { if (!newAlias) setActiveFocus(null); }}
-                  placeholder="Add a nickname..."
+                  placeholder={t('modals.addAliasPlaceholder')}
                   placeholderTextColor="#888"
                   onSubmitEditing={addAlias}
                   returnKeyType="done"
@@ -265,7 +267,7 @@ export default function CreateItemModal({
 
           {!activeFocus && (
             <>
-              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>Timing</Text>
+              <Text style={[styles.label, settings.compactMode && styles.textExtraSmall]}>{t('modals.timingLabel')}</Text>
               <View style={[styles.dropdownContainer, settings.compactMode && styles.dropdownContainerCompact]}>
                 <DropdownSelect
                   value={timing}
@@ -277,7 +279,7 @@ export default function CreateItemModal({
               {isEditMode && initialPrice !== null && (
                 <View style={[styles.correctionSection, settings.compactMode && styles.correctionSectionCompact]}>
                   <View style={styles.correctionHeader}>
-                    <Text style={[styles.label, { marginTop: 0 }, settings.compactMode && styles.textExtraSmall]}>Update Mode</Text>
+                    <Text style={[styles.label, { marginTop: 0 }, settings.compactMode && styles.textExtraSmall]}>{t('modals.updateModeLabel')}</Text>
                     <TouchableOpacity onPress={showPriceHelp} style={styles.helpBtn}>
                       <FontAwesome name="question-circle" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
                     </TouchableOpacity>
@@ -291,7 +293,7 @@ export default function CreateItemModal({
                       ]} 
                       onPress={() => setIsCorrection(false)}
                     >
-                      <Text style={[styles.modeBtnText, !isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Market Change</Text>
+                      <Text style={[styles.modeBtnText, !isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>{t('modals.marketChange')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={[
@@ -301,7 +303,7 @@ export default function CreateItemModal({
                       ]} 
                       onPress={() => setIsCorrection(true)}
                     >
-                      <Text style={[styles.modeBtnText, isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>Correction</Text>
+                      <Text style={[styles.modeBtnText, isCorrection && styles.modeBtnTextActive, settings.compactMode && styles.textExtraSmall]}>{t('modals.correction')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -309,7 +311,7 @@ export default function CreateItemModal({
 
               <View style={[styles.buttonRow, settings.compactMode && styles.buttonRowCompact]}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-                  <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>Cancel</Text>
+                  <Text style={[styles.cancelBtnText, settings.compactMode && styles.textSmall]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.submitBtn, !name.trim() && { opacity: 0.5 }, settings.compactMode && styles.submitBtnCompact]}
@@ -357,6 +359,7 @@ const styles = StyleSheet.create({
     color: '#aaa',
     marginBottom: 5,
     marginTop: 10,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   hint: {
     fontSize: 12,
@@ -372,6 +375,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#444',
+    marginBottom: 5,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   suggestionsContainer: {
     backgroundColor: '#333',
@@ -388,6 +393,7 @@ const styles = StyleSheet.create({
   suggestionText: {
     color: '#2f95dc',
     fontSize: 14,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   dropdownContainer: {
     marginBottom: 10,

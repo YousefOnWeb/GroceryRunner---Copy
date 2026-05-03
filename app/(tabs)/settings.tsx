@@ -1,19 +1,20 @@
-import { Text, View, StyleSheet, Switch, TouchableOpacity, Modal, SafeAreaView, ScrollView } from 'react-native';
+import { Text, View, StyleSheet, Switch, TouchableOpacity, Modal, SafeAreaView, ScrollView, Alert, I18nManager, NativeModules } from 'react-native';
 import { api } from '@/db/api';
 import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import React, { useEffect, useState } from 'react';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Alert } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import { useTranslation } from '@/utils/i18n';
 
 const SHOW_DEV_SECTION = true; // Toggle this manually to show/hide the dev section
 
 export default function SettingsScreen() {
   const { settings, updateSetting } = useSettings();
+  const { t } = useTranslation();
   const [locations, setLocations] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
   
@@ -55,11 +56,11 @@ export default function SettingsScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri);
       } else {
-        Alert.alert('Sharing not available', 'The file was saved locally but cannot be shared.');
+        Alert.alert(t('settings.shareUnavailable'), t('settings.shareUnavailableMsg'));
       }
     } catch (e) {
       console.error(e);
-      Alert.alert('Export Failed', 'An error occurred while generating the export file.');
+      Alert.alert(t('settings.exportFailed'), t('settings.exportFailedMsg'));
     } finally {
       setIsExporting(false);
     }
@@ -81,10 +82,10 @@ export default function SettingsScreen() {
       await api.importData(importObj, importStrategy);
       
       await refreshPreviews();
-      Alert.alert('Import Successful', 'Your data has been merged successfully.');
+      Alert.alert(t('settings.importSuccess'), t('settings.importSuccessMsg'));
     } catch (e: any) {
       console.error(e);
-      Alert.alert('Import Failed', e.message || 'An error occurred while importing the file.');
+      Alert.alert(t('settings.importFailed'), e.message || t('settings.importFailedMsg'));
     } finally {
       setIsImporting(false);
     }
@@ -110,21 +111,21 @@ export default function SettingsScreen() {
   return (
     <View collapsable={false} style={styles.container}>
       <ScrollView contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact]}>
-        <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>Settings</Text>
+        <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>{t('settings.title')}</Text>
 
         {/* Reorder Delivery Locations */}
         <View style={[styles.sectionCard, settings.compactMode && styles.cardCompact]}>
           <View style={[styles.sectionHeaderRow, settings.compactMode && styles.headerRowCompact]}>
             <View>
-              <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>Delivery Groups</Text>
-              <Text style={[styles.sectionHint, settings.compactMode && styles.textExtraSmall]}>Manage how your run is grouped by location.</Text>
+              <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>{t('settings.deliveryGroupTitle')}</Text>
+              <Text style={[styles.sectionHint, settings.compactMode && styles.textExtraSmall]}>{t('settings.deliveryGroupHint')}</Text>
             </View>
             <TouchableOpacity 
               style={[styles.editButton, settings.compactMode && styles.btnCompact]} 
               onPress={() => setActiveModal('locations')}
             >
-              <FontAwesome name="sort" size={settings.compactMode ? 12 : 14} color="#fff" style={{ marginRight: settings.compactMode ? 4 : 6 }} />
-              <Text style={[styles.editButtonText, settings.compactMode && styles.textExtraSmall]}>Edit Order</Text>
+              <FontAwesome name="sort" size={settings.compactMode ? 12 : 14} color="#fff" style={{ marginEnd: settings.compactMode ? 4 : 6 }} />
+              <Text style={[styles.editButtonText, settings.compactMode && styles.textExtraSmall]}>{t('settings.editOrderBtn')}</Text>
             </TouchableOpacity>
           </View>
           <View style={[styles.previewContainer, settings.compactMode && styles.previewCompact]}>
@@ -134,7 +135,7 @@ export default function SettingsScreen() {
               </Text>
             ))}
             {locations.length > (settings.compactMode ? 2 : 3) && (
-              <Text style={[styles.previewTextMore, settings.compactMode && styles.textExtraSmall]}>+ {locations.length - (settings.compactMode ? 2 : 3)} more...</Text>
+              <Text style={[styles.previewTextMore, settings.compactMode && styles.textExtraSmall]}>{t('settings.moreItems', { count: locations.length - (settings.compactMode ? 2 : 3) })}</Text>
             )}
           </View>
         </View>
@@ -143,15 +144,15 @@ export default function SettingsScreen() {
         <View style={[styles.sectionCard, settings.compactMode && styles.cardCompact]}>
           <View style={[styles.sectionHeaderRow, settings.compactMode && styles.headerRowCompact]}>
             <View>
-              <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>Shopping Sources</Text>
-              <Text style={[styles.sectionHint, settings.compactMode && styles.textExtraSmall]}>Set the sequence of stores in your list.</Text>
+              <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>{t('settings.shoppingSourceTitle')}</Text>
+              <Text style={[styles.sectionHint, settings.compactMode && styles.textExtraSmall]}>{t('settings.shoppingSourceHint')}</Text>
             </View>
             <TouchableOpacity 
               style={[styles.editButton, settings.compactMode && styles.btnCompact]} 
               onPress={() => setActiveModal('sources')}
             >
-              <FontAwesome name="sort" size={settings.compactMode ? 12 : 14} color="#fff" style={{ marginRight: settings.compactMode ? 4 : 6 }} />
-              <Text style={[styles.editButtonText, settings.compactMode && styles.textExtraSmall]}>Edit Order</Text>
+              <FontAwesome name="sort" size={settings.compactMode ? 12 : 14} color="#fff" style={{ marginEnd: settings.compactMode ? 4 : 6 }} />
+              <Text style={[styles.editButtonText, settings.compactMode && styles.textExtraSmall]}>{t('settings.editOrderBtn')}</Text>
             </TouchableOpacity>
           </View>
           <View style={[styles.previewContainer, settings.compactMode && styles.previewCompact]}>
@@ -161,7 +162,7 @@ export default function SettingsScreen() {
               </Text>
             ))}
             {sources.length > (settings.compactMode ? 2 : 3) && (
-              <Text style={[styles.previewTextMore, settings.compactMode && styles.textExtraSmall]}>+ {sources.length - (settings.compactMode ? 2 : 3)} more...</Text>
+              <Text style={[styles.previewTextMore, settings.compactMode && styles.textExtraSmall]}>{t('settings.moreItems', { count: sources.length - (settings.compactMode ? 2 : 3) })}</Text>
             )}
           </View>
         </View>
@@ -169,13 +170,13 @@ export default function SettingsScreen() {
         <View style={styles.separator} />
 
         {/* UI Settings */}
-        <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>UI Settings</Text>
+        <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>{t('settings.uiSettings')}</Text>
         
         <View style={[styles.settingRow, settings.compactMode && styles.rowCompact]}>
           <View style={styles.settingInfo}>
-            <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Compact Mode</Text>
+            <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>{t('settings.compactMode')}</Text>
             <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall]}>
-              Reduce padding and font sizes for a denser layout
+              {t('settings.compactModeHint')}
             </Text>
           </View>
           <Switch
@@ -188,9 +189,58 @@ export default function SettingsScreen() {
 
         <View style={[styles.settingRow, settings.compactMode && styles.rowCompact]}>
           <View style={styles.settingInfo}>
-            <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Group by Freshness</Text>
+            <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>{t('settings.languageLabel')}</Text>
             <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall]}>
-              Split the shopping list into "Fresh" and "Anytime"
+              {t('settings.languageHint')}
+            </Text>
+          </View>
+          <View style={styles.strategyRow}>
+            <TouchableOpacity 
+              style={[styles.strategyToggle, settings.language === 'en' && styles.strategyActive]} 
+              onPress={() => {
+                updateSetting('language', 'en');
+                if (I18nManager.isRTL) {
+                  I18nManager.allowRTL(false);
+                  I18nManager.forceRTL(false);
+                  setTimeout(() => {
+                    if (NativeModules.DevSettings) {
+                      NativeModules.DevSettings.reload();
+                    } else {
+                      Alert.alert(t('settings.restartRequired'), t('settings.restartMsg'));
+                    }
+                  }, 500);
+                }
+              }}
+            >
+              <Text style={[styles.strategyText, settings.language === 'en' && styles.strategyTextActive]}>{t('settings.langEnglish')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.strategyToggle, settings.language === 'ar' && styles.strategyActiveReplace]} 
+              onPress={() => {
+                updateSetting('language', 'ar');
+                if (!I18nManager.isRTL) {
+                  I18nManager.allowRTL(true);
+                  I18nManager.forceRTL(true);
+                  setTimeout(() => {
+                    if (NativeModules.DevSettings) {
+                      NativeModules.DevSettings.reload();
+                    } else {
+                      Alert.alert(t('settings.restartRequired'), t('settings.restartMsg'));
+                    }
+                  }, 500);
+                }
+              }}
+            >
+              <Text style={[styles.strategyText, settings.language === 'ar' && styles.strategyTextActive]}>{t('settings.langArabic')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={[styles.settingRow, settings.compactMode && styles.rowCompact]}>
+          <View style={styles.settingInfo}>
+            <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>{t('settings.groupByFreshness')}</Text>
+            <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall]}>
+              {t('settings.groupByFreshnessHint')}
             </Text>
           </View>
           <Switch
@@ -204,12 +254,12 @@ export default function SettingsScreen() {
         <View style={styles.separator} />
 
         {/* Data Management */}
-        <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>Data Management</Text>
+        <Text style={[styles.sectionHeader, settings.compactMode && styles.textSmall]}>{t('settings.dataManagement')}</Text>
         
         <View style={[styles.sectionCard, settings.compactMode && styles.cardCompact, { marginTop: 10 }]}>
-          <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Export Data</Text>
+          <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>{t('settings.exportData')}</Text>
           <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall, { marginBottom: 15 }]}>
-            Save all your persons, items, and orders to a file. You can use this file to move your data to another device or keep a backup.
+            {t('settings.exportHint')}
           </Text>
           <TouchableOpacity 
             style={[styles.actionButton, isExporting && { opacity: 0.7 }, settings.compactMode && styles.btnCompact]} 
@@ -218,36 +268,34 @@ export default function SettingsScreen() {
           >
             <FontAwesome name="upload" size={settings.compactMode ? 14 : 16} color="#fff" />
             <Text style={[styles.actionButtonText, settings.compactMode && styles.textSmall]}>
-              {isExporting ? 'Exporting...' : 'Export to File'}
+              {isExporting ? t('settings.exporting') : t('settings.exportBtn')}
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={[styles.sectionCard, settings.compactMode && styles.cardCompact]}>
-          <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Import Data</Text>
+          <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>{t('settings.importData')}</Text>
           <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall, { marginBottom: 15 }]}>
-            Load data from a previously exported file. New data will be merged with your current data.
+            {t('settings.importHint')}
           </Text>
           
           <View style={styles.strategyRow}>
-            <Text style={[styles.strategyLabel, settings.compactMode && styles.textExtraSmall]}>Conflict Policy:</Text>
+            <Text style={[styles.strategyLabel, settings.compactMode && styles.textExtraSmall]}>{t('settings.conflictPolicy')}</Text>
             <TouchableOpacity 
               style={[styles.strategyToggle, importStrategy === 'skip' && styles.strategyActive]} 
               onPress={() => setImportStrategy('skip')}
             >
-              <Text style={[styles.strategyText, importStrategy === 'skip' && styles.strategyTextActive]}>Skip Duplicates</Text>
+              <Text style={[styles.strategyText, importStrategy === 'skip' && styles.strategyTextActive]}>{t('settings.skipDuplicates')}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.strategyToggle, importStrategy === 'replace' && styles.strategyActiveReplace]} 
               onPress={() => setImportStrategy('replace')}
             >
-              <Text style={[styles.strategyText, importStrategy === 'replace' && styles.strategyTextActive]}>Replace Existing</Text>
+              <Text style={[styles.strategyText, importStrategy === 'replace' && styles.strategyTextActive]}>{t('settings.replaceExisting')}</Text>
             </TouchableOpacity>
           </View>
           <Text style={[styles.strategyHint, settings.compactMode && styles.textExtraSmall]}>
-            {importStrategy === 'skip' 
-              ? 'If an item or person already exists, it will be skipped.' 
-              : 'If an item or person already exists, its details will be updated with the file data.'}
+            {importStrategy === 'skip' ? t('settings.skipHint') : t('settings.replaceHint')}
           </Text>
 
           <TouchableOpacity 
@@ -257,7 +305,7 @@ export default function SettingsScreen() {
           >
             <FontAwesome name="download" size={settings.compactMode ? 14 : 16} color="#fff" />
             <Text style={[styles.actionButtonText, settings.compactMode && styles.textSmall]}>
-              {isImporting ? 'Importing...' : 'Import from File'}
+              {isImporting ? t('settings.importing') : t('settings.importBtn')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -265,13 +313,13 @@ export default function SettingsScreen() {
         {SHOW_DEV_SECTION && (
           <>
             <View style={styles.separator} />
-            <Text style={[styles.sectionHeader, { color: '#ff4444' }, settings.compactMode && styles.textSmall]}>Developer/Tester</Text>
+            <Text style={[styles.sectionHeader, { color: '#ff4444' }, settings.compactMode && styles.textSmall]}>{t('settings.devSection')}</Text>
             
             <View style={[styles.settingRow, settings.compactMode && styles.rowCompact]}>
               <View style={styles.settingInfo}>
-                <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>Seed Dummy Data</Text>
+                <Text style={[styles.settingLabel, settings.compactMode && styles.textSmall]}>{t('settings.seedData')}</Text>
                 <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall]}>
-                  Generate test orders, people, and items
+                  {t('settings.seedHint')}
                 </Text>
               </View>
               <TouchableOpacity
@@ -284,29 +332,29 @@ export default function SettingsScreen() {
 
             <View style={[styles.settingRow, settings.compactMode && styles.rowCompact]}>
               <View style={styles.settingInfo}>
-                <Text style={[styles.settingLabel, { color: '#ff4444' }, settings.compactMode && styles.textSmall]}>Wipe All Data</Text>
+                <Text style={[styles.settingLabel, { color: '#ff4444' }, settings.compactMode && styles.textSmall]}>{t('settings.wipeData')}</Text>
                 <Text style={[styles.settingHint, settings.compactMode && styles.textExtraSmall]}>
-                  Permanently delete everything
+                  {t('settings.wipeHint')}
                 </Text>
               </View>
               <TouchableOpacity
                 style={[styles.devButton, { backgroundColor: '#ff4444' }, settings.compactMode && styles.btnCompact]}
                 onPress={() => {
                   Alert.alert(
-                    'Wipe All Data',
-                    'Are you sure? This is permanent.',
+                    t('settings.wipeConfirmTitle'),
+                    t('settings.wipeConfirmMsg'),
                     [
-                      { text: 'Cancel', style: 'cancel' },
+                      { text: t('common.cancel'), style: 'cancel' },
                       { 
-                        text: 'Wipe', 
+                        text: t('settings.wipeBtn'), 
                         style: 'destructive',
                         onPress: async () => {
                           try {
                             await api.wipeAllData();
                             await refreshPreviews();
-                            Alert.alert('Success', 'All data wiped.');
+                            Alert.alert(t('common.success'), t('settings.wipeSuccess'));
                           } catch (e) {
-                            Alert.alert('Error', 'Failed to wipe data.');
+                            Alert.alert(t('common.error'), t('settings.wipeError'));
                           }
                         }
                       }
@@ -331,19 +379,19 @@ export default function SettingsScreen() {
           <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                  {activeModal === 'locations' ? 'Reorder Deliveries' : activeModal === 'sources' ? 'Reorder Stores' : 'Seed Data Options'}
+                  {activeModal === 'locations' ? t('settings.reorderDeliveries') : activeModal === 'sources' ? t('settings.reorderStores') : t('settings.seedOptions')}
                 </Text>
                 <TouchableOpacity 
                   style={styles.closeButton} 
                   onPress={() => setActiveModal(null)}
                 >
-                  <Text style={styles.closeButtonText}>Done</Text>
+                  <Text style={styles.closeButtonText}>{t('settings.done')}</Text>
                 </TouchableOpacity>
               </View>
               
               {activeModal !== 'seed' ? (
                 <>
-                  <Text style={styles.modalHint}>Long press and drag to reorder items.</Text>
+                  <Text style={styles.modalHint}>{t('settings.dragHint')}</Text>
 
                   <DraggableFlatList
                     data={activeModal === 'locations' ? locations : sources}
@@ -363,11 +411,11 @@ export default function SettingsScreen() {
                 </>
               ) : (
                 <ScrollView style={styles.seedModalContent}>
-                  <Text style={styles.modalHint}>Configure the dummy data to be generated.</Text>
+                  <Text style={styles.modalHint}>{t('settings.seedHintDetails')}</Text>
                   
                   <View style={styles.settingRow}>
                     <View style={styles.settingInfo}>
-                      <Text style={styles.settingLabel}>Number of People</Text>
+                      <Text style={styles.settingLabel}>{t('settings.numPeople')}</Text>
                     </View>
                     <View style={styles.numberInputContainer}>
                       <TouchableOpacity onPress={() => setSeedOptions(s => ({ ...s, peopleCount: Math.max(1, s.peopleCount - 1) }))} style={styles.numberBtn}>
@@ -382,7 +430,7 @@ export default function SettingsScreen() {
 
                   <View style={styles.settingRow}>
                     <View style={styles.settingInfo}>
-                      <Text style={styles.settingLabel}>Number of Items</Text>
+                      <Text style={styles.settingLabel}>{t('settings.numItems')}</Text>
                     </View>
                     <View style={styles.numberInputContainer}>
                       <TouchableOpacity onPress={() => setSeedOptions(s => ({ ...s, itemsCount: Math.max(1, s.itemsCount - 1) }))} style={styles.numberBtn}>
@@ -397,7 +445,7 @@ export default function SettingsScreen() {
 
                   <View style={styles.settingRow}>
                     <View style={styles.settingInfo}>
-                      <Text style={styles.settingLabel}>Seed Today's Orders</Text>
+                      <Text style={styles.settingLabel}>{t('settings.seedTodayOrders')}</Text>
                     </View>
                     <Switch
                       value={seedOptions.seedOrders}
@@ -413,13 +461,13 @@ export default function SettingsScreen() {
                       try {
                         await api.seedDummyData(seedOptions);
                         setActiveModal(null);
-                        Alert.alert('Success', 'Dummy data generated.');
+                        Alert.alert(t('common.success'), t('settings.seedSuccess'));
                       } catch (e) {
-                        Alert.alert('Error', 'Failed to generate dummy data.');
+                        Alert.alert(t('common.error'), t('settings.seedError'));
                       }
                     }}
                   >
-                    <Text style={styles.seedConfirmText}>Generate Data</Text>
+                    <Text style={styles.seedConfirmText}>{t('settings.generateBtn')}</Text>
                   </TouchableOpacity>
                 </ScrollView>
               )}
@@ -433,7 +481,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#111' },
   content: { padding: 20 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 30 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 30, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   sectionCard: {
     backgroundColor: '#222',
     borderRadius: 12,
@@ -453,10 +501,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2f95dc',
     marginBottom: 4,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   sectionHint: {
     fontSize: 12,
     color: '#888',
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   editButton: {
     backgroundColor: '#2f95dc',
@@ -500,7 +550,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 10,
   },
-  settingInfo: { flex: 1, marginRight: 15 },
+  settingInfo: { flex: 1, marginEnd: 15 },
   settingLabel: { fontSize: 16, color: '#fff', fontWeight: '600', marginBottom: 4 },
   settingHint: { fontSize: 12, color: '#888' },
   
@@ -528,7 +578,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#444',
   },
-  dragHandle: { marginRight: 15 },
+  dragHandle: { marginEnd: 15 },
   draggableText: { fontSize: 16, color: '#fff' },
   
   // Compact Modifiers

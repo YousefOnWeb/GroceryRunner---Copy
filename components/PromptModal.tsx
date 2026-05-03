@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Modal, View, TextInput, TouchableOpacity, I18nManager } from 'react-native';
 import { Text } from '@/components/Themed';
+import { useTranslation } from '@/utils/i18n';
 
 interface PromptModalProps {
   visible: boolean;
@@ -24,6 +25,7 @@ export default function PromptModal({
   onSubmit,
 }: PromptModalProps) {
   const [value, setValue] = useState(defaultValue);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (visible) {
@@ -48,7 +50,7 @@ export default function PromptModal({
           />
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.submitBtn}
@@ -56,7 +58,7 @@ export default function PromptModal({
                 onSubmit(value);
                 setValue('');
               }}>
-              <Text style={styles.submitBtnText}>Submit</Text>
+              <Text style={styles.submitBtnText}>{t('modals.submit')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -101,9 +103,10 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     fontSize: 16,
-    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#444',
+    marginBottom: 5,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   buttonRow: {
     flexDirection: 'row',
