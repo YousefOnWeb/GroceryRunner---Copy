@@ -55,7 +55,7 @@ export function formatDateLabel(date: Date, t: (key: string) => string, daysShor
   tomorrow.setDate(today.getDate() + 1);
   const tomorrowStr = getLocalDateString(tomorrow);
   
-  let label = `${value} (${weekday})`;
+  let label = `\u2066${value} (${weekday})\u2069`;
   if (value === todayStr) label = `${t('common.today')} - ${label}`;
   else if (value === tomorrowStr) label = `${t('common.tomorrow')} - ${label}`;
   

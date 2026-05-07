@@ -43,7 +43,7 @@ export default function TheRunScreen() {
   const [payAmountOrder, setPayAmountOrder] = useState<{ id: string; personId: string; total: number; personName: string } | null>(null);
 
   const { settings } = useSettings();
-  const { t } = useTranslation();
+  const { t, isRTL } = useTranslation();
 
   const dateOptions = useMemo(() => generateDateOptions(t, t('modals.daysShort')), [t]);
 
@@ -554,7 +554,7 @@ export default function TheRunScreen() {
                             settings.compactMode && styles.itemTextCompact,
                             checkedItems[ag.item.id] && styles.itemTextCrossed,
                           ]}>
-                          {ag.totalQuantity}x {ag.item.name}
+                          {isRTL ? '\u200F' : ''}{ag.totalQuantity}x {ag.item.name}
                         </Text>
                       </View>
                       {ag.totalCost > 0 && (
@@ -686,7 +686,7 @@ export default function TheRunScreen() {
                           </TouchableOpacity>
                           <View style={[styles.itemInfo, { alignItems: 'flex-start' }]}>
                             <Text style={[styles.personItemText, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid]}>
-                              {i.quantity}x {i.itemDef?.name} - {i.unitPrice === null ? t('common.priceTBD') : `$${itemCost.toFixed(2)}`}
+                              {isRTL ? '\u200F•\u00A0' : '• '}{i.quantity}x {i.itemDef?.name} - {i.unitPrice === null ? t('common.priceTBD') : `$${itemCost.toFixed(2)}`}
                             </Text>
                           </View>
                         </View>

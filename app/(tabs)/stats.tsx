@@ -25,7 +25,7 @@ export default function StatsScreen() {
   const { data: sourceAliasesList } = useLiveQuery(db.select().from(sourceAliases));
 
   const { settings } = useSettings();
-  const { t } = useTranslation();
+  const { t, isRTL } = useTranslation();
 
   const [activeTab, setActiveTab] = useState<'Items' | 'Places' | 'Sources'>('Items');
   const [searchQuery, setSearchQuery] = useState('');
@@ -400,12 +400,16 @@ export default function StatsScreen() {
               
               <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>{t('stats.topSpenders')}</Text>
               {stats.topSpenders.map((p, idx) => (
-                <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {p.name} - ${p.total.toFixed(2)}</Text>
+                <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>
+                  {isRTL ? '\u2066' : ''}{idx + 1}. {p.name} - ${p.total.toFixed(2)}{isRTL ? '\u2069' : ''}
+                </Text>
               ))}
 
               <Text style={[styles.subTitle, settings.compactMode && styles.subTitleCompact]}>{t('stats.topItems')}</Text>
               {stats.topItems.map((i, idx) => (
-                <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>{idx + 1}. {i.name} ({i.qty} {t('stats.ordered')})</Text>
+                <Text key={idx} style={[styles.listItem, settings.compactMode && styles.textSmall]}>
+                  {isRTL ? '\u2066' : ''}{idx + 1}. {i.name} ({i.qty} {t('stats.ordered')}){isRTL ? '\u2069' : ''}
+                </Text>
               ))}
             </View>
             <View style={styles.separator} />
@@ -567,7 +571,7 @@ const styles = StyleSheet.create({
   statText: { fontSize: 16, color: '#ccc', marginBottom: 5, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   highlight: { color: '#ffeb3b', fontWeight: 'bold', fontSize: 18, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   subTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginTop: 15, marginBottom: 10 },
-  listItem: { color: '#ddd', fontSize: 15, marginStart: 10, marginBottom: 5 },
+  listItem: { color: '#ddd', fontSize: 15, marginStart: 10, marginBottom: 5, textAlign: 'left' },
   separator: { height: 1, backgroundColor: '#555', marginVertical: 20 },
   helperText: { color: '#888', fontSize: 13, textAlign: 'center', marginBottom: 15, fontStyle: 'italic' },
   exitSearchBtn: {
@@ -614,7 +618,7 @@ const styles = StyleSheet.create({
   aliasesText: { fontSize: 12, color: '#aaa', marginTop: 2, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   iconBtn: { padding: 5 },
   itemDetails: { gap: 5 },
-  detailText: { color: '#ccc', textAlign: I18nManager.isRTL ? 'right' : 'left' },
+  detailText: { color: '#ccc', textAlign: 'left' },
   checkboxContainer: { paddingStart: 15 },
   
   // Compact Modifiers

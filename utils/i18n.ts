@@ -113,7 +113,8 @@ export const translations = {
       recentLogs: 'Recent Logs:',
       moreTransactions: '... and {count} more transactions',
       balanceSummaryCopied: 'Balance summary copied to clipboard.',
-      daysShort: 'Sun,Mon,Tue,Wed,Thu,Fri,Sat'
+      daysShort: 'Sun,Mon,Tue,Wed,Thu,Fri,Sat',
+      viewOrders: 'View Orders',
     },
     stats: {
       appStatsTitle: '📊 App Statistics',
@@ -273,7 +274,13 @@ export const translations = {
       editEntityTitle: 'Edit {entityType}',
       entityNameLabel: '{entityType} Name *',
       saving: 'Saving...',
-      submit: 'Submit'
+      submit: 'Submit',
+      personOrdersTitle: 'Orders: {name}',
+      searchOrdersPlaceholder: 'Search items or dates...',
+      sortStatus: 'Status',
+      sortTotal: 'Total',
+      paid: 'Paid',
+      unpaid: 'Unpaid',
     }
   },
   ar: {
@@ -388,7 +395,8 @@ export const translations = {
       recentLogs: 'السجلات الأخيرة:',
       moreTransactions: '... و {count} معاملات أخرى',
       balanceSummaryCopied: 'تم نسخ ملخص الرصيد إلى الحافظة.',
-      daysShort: 'الأحد,الإثنين,الثلاثاء,الأربعاء,الخميس,الجمعة,السبت'
+      daysShort: 'الأحد,الإثنين,الثلاثاء,الأربعاء,الخميس,الجمعة,السبت',
+      viewOrders: 'عرض الطلبات',
     },
     stats: {
       appStatsTitle: '📊 إحصائيات التطبيق',
@@ -548,7 +556,13 @@ export const translations = {
       editEntityTitle: 'تعديل {entityType}',
       entityNameLabel: 'اسم {entityType} *',
       saving: 'جاري الحفظ...',
-      submit: 'إرسال'
+      submit: 'إرسال',
+      personOrdersTitle: 'طلبات: {name}',
+      searchOrdersPlaceholder: 'ابحث في الأصناف أو التواريخ...',
+      sortStatus: 'الحالة',
+      sortTotal: 'المجموع',
+      paid: 'مدفوع',
+      unpaid: 'غير مدفوع',
     }
   }
 };

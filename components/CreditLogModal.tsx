@@ -45,7 +45,7 @@ export default function CreditLogModal({ visible, personId, personName, onClose 
     const locale = isRTL ? 'ar' : 'en-US';
     const date = d.toLocaleDateString(locale);
     const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-    return `${day}, ${date} ${time}`;
+    return `\u2066${day}, ${date} ${time}\u2069`;
   };
 
   const getAmountColor = (amount: number) => {

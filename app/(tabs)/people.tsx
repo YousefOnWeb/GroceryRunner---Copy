@@ -2,6 +2,7 @@ import PersonModal from '@/components/PersonModal';
 import MergeModal from '@/components/MergeModal';
 import UnknownPriceModal from '@/components/UnknownPriceModal';
 import CreditLogModal from '@/components/CreditLogModal';
+import PersonOrdersModal from '@/components/PersonOrdersModal';
 import { Text, View } from '@/components/Themed';
 import { db } from '@/db';
 import { api } from '@/db/api';
@@ -41,6 +42,9 @@ export default function PeopleScreen() {
 
   // Credit log modal
   const [logPerson, setLogPerson] = useState<{ id: string; name: string } | null>(null);
+
+  // Orders modal
+  const [ordersPerson, setOrdersPerson] = useState<{ id: string; name: string } | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -426,6 +430,9 @@ export default function PeopleScreen() {
                     <TouchableOpacity onPress={() => setLogPerson({ id: person.id, name: person.name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
                       <FontAwesome name="history" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
                     </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setOrdersPerson({ id: person.id, name: person.name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
+                      <FontAwesome name="shopping-cart" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                    </TouchableOpacity>
                     {!selectionMode && (
                       <TouchableOpacity onPress={() => handleEditPress(person)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
                         <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
@@ -531,6 +538,14 @@ export default function PeopleScreen() {
           onConfirm={handleConfirmMerge}
         />
       )}
+      {ordersPerson && (
+        <PersonOrdersModal
+          visible={!!ordersPerson}
+          personId={ordersPerson.id}
+          personName={ordersPerson.name}
+          onClose={() => setOrdersPerson(null)}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -571,7 +586,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     backgroundColor: 'rgba(47, 149, 220, 0.1)',
   },
-  info: { flex: 1 },
+  info: { flex: 1, alignItems: 'flex-start' },
   nameRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
