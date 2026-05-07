@@ -60,6 +60,7 @@ export const translations = {
       payAmountTitle: 'Custom Payment',
       payAmountMsg: 'Order total is ${total}. How much did {name} pay?',
       paymentAdjustment: 'Payment adjustment for order on {date}',
+      markAllPastAsPaid: 'Mark all past orders as paid',
     },
     addOrder: {
       createTitle: 'Create New Order',
@@ -342,6 +343,7 @@ export const translations = {
       payAmountTitle: 'دفع مبلغ مخصص',
       payAmountMsg: 'إجمالي الطلب هو ${total}. كم دفع {name}؟',
       paymentAdjustment: 'تعديل الدفع لطلب بتاريخ {date}',
+      markAllPastAsPaid: 'تحديد جميع الطلبات السابقة كمدفوعة',
     },
     addOrder: {
       createTitle: 'إنشاء طلب جديد',

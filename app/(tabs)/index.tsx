@@ -239,7 +239,7 @@ export default function TheRunScreen() {
     }
   };
 
-  const handleCustomPayment = async (value: string) => {
+  const handleCustomPayment = async (value: string, markAllPast: boolean = false) => {
     if (!payAmountOrder) return;
     const paidAmount = parseFloat(value);
     if (isNaN(paidAmount)) {
@@ -248,15 +248,19 @@ export default function TheRunScreen() {
     }
 
     const { id: orderId, personId, total: orderTotal } = payAmountOrder;
-    const personName = payAmountOrder.personName;
     setPayAmountOrder(null);
 
     try {
-      await api.markOrderPaid(orderId, personId);
-      const diff = paidAmount - orderTotal;
-      if (Math.abs(diff) > 0.001) {
+      if (markAllPast) {
+        await api.markAllOrdersPaidSilently(personId);
+      } else {
+        await api.markOrderPaid(orderId, personId);
+      }
+      
+      const diff = markAllPast ? paidAmount : paidAmount - orderTotal;
+      if (Math.abs(diff) > 0.001 || (markAllPast && paidAmount !== 0)) {
         const dateStr = getLocalDateString(targetDate);
-        await api.changeBalance(personId, diff, t('run.paymentAdjustment', { date: dateStr }));
+        await api.changeBalance(personId, markAllPast ? paidAmount : diff, t('run.paymentAdjustment', { date: dateStr }));
       }
     } catch (e) {
       console.error(e);
@@ -809,6 +813,8 @@ export default function TheRunScreen() {
           message={t('run.payAmountMsg', { total: payAmountOrder.total.toFixed(2), name: payAmountOrder.personName })}
           defaultValue={payAmountOrder.total.toFixed(2)}
           keyboardType="numeric"
+          showToggle={true}
+          toggleLabel={t('run.markAllPastAsPaid')}
           onCancel={() => setPayAmountOrder(null)}
           onSubmit={handleCustomPayment}
         />

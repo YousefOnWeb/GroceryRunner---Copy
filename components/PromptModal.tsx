@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Modal, View, TextInput, TouchableOpacity, I18nManager } from 'react-native';
+import { StyleSheet, Modal, View, TextInput, TouchableOpacity, I18nManager, Pressable } from 'react-native';
 import { Text } from '@/components/Themed';
 import { useTranslation } from '@/utils/i18n';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 interface PromptModalProps {
   visible: boolean;
@@ -10,8 +11,10 @@ interface PromptModalProps {
   placeholder?: string;
   defaultValue?: string;
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
+  showToggle?: boolean;
+  toggleLabel?: string;
   onCancel: () => void;
-  onSubmit: (value: string) => void;
+  onSubmit: (value: string, toggleValue: boolean) => void;
 }
 
 export default function PromptModal({
@@ -21,15 +24,19 @@ export default function PromptModal({
   placeholder,
   defaultValue = '',
   keyboardType = 'default',
+  showToggle,
+  toggleLabel,
   onCancel,
   onSubmit,
 }: PromptModalProps) {
   const [value, setValue] = useState(defaultValue);
+  const [toggleActive, setToggleActive] = useState(false);
   const { t } = useTranslation();
 
   useEffect(() => {
     if (visible) {
       setValue(defaultValue);
+      setToggleActive(false);
     }
   }, [visible, defaultValue]);
 
@@ -48,6 +55,21 @@ export default function PromptModal({
             keyboardType={keyboardType}
             autoFocus
           />
+
+          {showToggle && (
+            <Pressable 
+              style={styles.toggleRow} 
+              onPress={() => setToggleActive(!toggleActive)}
+            >
+              <FontAwesome 
+                name={toggleActive ? 'check-square-o' : 'square-o'} 
+                size={20} 
+                color={toggleActive ? '#2f95dc' : '#888'} 
+              />
+              <Text style={styles.toggleLabel}>{toggleLabel}</Text>
+            </Pressable>
+          )}
+
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
               <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
@@ -55,8 +77,9 @@ export default function PromptModal({
             <TouchableOpacity
               style={styles.submitBtn}
               onPress={() => {
-                onSubmit(value);
+                onSubmit(value, toggleActive);
                 setValue('');
+                setToggleActive(false);
               }}>
               <Text style={styles.submitBtnText}>{t('modals.submit')}</Text>
             </TouchableOpacity>
@@ -138,5 +161,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 20,
+    marginTop: 5,
+  },
+  toggleLabel: {
+    color: '#ccc',
+    fontSize: 14,
+    flex: 1,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
 });

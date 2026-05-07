@@ -398,6 +398,15 @@ export const api = {
     return api.markAllPaid(orderId, personId);
   },
 
+  markAllOrdersPaidSilently: async (personId: string) => {
+    await db.update(orderItems)
+      .set({ isPaid: true })
+      .where(sql`${orderItems.orderId} IN (SELECT id FROM ${orders} WHERE personId = ${personId})`);
+    await db.update(orders)
+      .set({ isPaid: true })
+      .where(eq(orders.personId, personId));
+  },
+
   markOrderUnpaid: async (orderId: string, personId: string) => {
     const itemsInOrder = await db.select().from(orderItems).where(
       and(eq(orderItems.orderId, orderId), eq(orderItems.isPaid, true))
