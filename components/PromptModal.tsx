@@ -91,11 +91,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 10,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
+    writingDirection: I18nManager.isRTL ? 'rtl' : 'ltr',
   },
   message: {
     fontSize: 16,
     color: '#ccc',
     marginBottom: 15,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
+    writingDirection: I18nManager.isRTL ? 'rtl' : 'ltr',
   },
   input: {
     backgroundColor: '#333',
@@ -105,8 +109,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#444',
-    marginBottom: 5,
+    marginBottom: 15,
     textAlign: I18nManager.isRTL ? 'right' : 'left',
+    writingDirection: I18nManager.isRTL ? 'rtl' : 'ltr',
   },
   buttonRow: {
     flexDirection: 'row',

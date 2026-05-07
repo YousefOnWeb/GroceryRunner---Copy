@@ -3,6 +3,7 @@ import DropdownSelect from '@/components/DropdownSelect';
 import UnknownPriceModal from '@/components/UnknownPriceModal';
 import CreditLogModal from '@/components/CreditLogModal';
 import { Text, View } from '@/components/Themed';
+import PromptModal from '@/components/PromptModal';
 import { db } from '@/db';
 import { api } from '@/db/api';
 import { items, orderItems, orders, persons } from '@/db/schema';
@@ -39,6 +40,7 @@ export default function TheRunScreen() {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [showMoveDatePicker, setShowMoveDatePicker] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [payAmountOrder, setPayAmountOrder] = useState<{ id: string; personId: string; total: number; personName: string } | null>(null);
 
   const { settings } = useSettings();
   const { t } = useTranslation();
@@ -234,6 +236,31 @@ export default function TheRunScreen() {
     } catch (e) {
       console.error(e);
       Alert.alert(t('common.error'), t('run.failedMarkUnpaid'));
+    }
+  };
+
+  const handleCustomPayment = async (value: string) => {
+    if (!payAmountOrder) return;
+    const paidAmount = parseFloat(value);
+    if (isNaN(paidAmount)) {
+      Alert.alert(t('common.error'), t('common.invalidAmount'));
+      return;
+    }
+
+    const { id: orderId, personId, total: orderTotal } = payAmountOrder;
+    const personName = payAmountOrder.personName;
+    setPayAmountOrder(null);
+
+    try {
+      await api.markOrderPaid(orderId, personId);
+      const diff = paidAmount - orderTotal;
+      if (Math.abs(diff) > 0.001) {
+        const dateStr = getLocalDateString(targetDate);
+        await api.changeBalance(personId, diff, t('run.paymentAdjustment', { date: dateStr }));
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert(t('common.error'), t('run.failedMarkPaid'));
     }
   };
 
@@ -701,11 +728,18 @@ export default function TheRunScreen() {
                     </View>
                     <View style={styles.buttonGroup}>
                       {po.hasUnpaidItems ? (
-                        <TouchableOpacity
-                          style={[styles.markAllPaidBtn, settings.compactMode && styles.compactBtn]}
-                          onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
-                          <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markAllPaid')}</Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TouchableOpacity
+                            style={[styles.payAmountBtn, settings.compactMode && styles.compactBtn]}
+                            onPress={() => setPayAmountOrder({ id: po.order.id, personId: po.person.id, total: po.totalCost, personName: po.person.name })}>
+                            <FontAwesome name="money" size={settings.compactMode ? 14 : 16} color="#fff" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.markAllPaidBtn, settings.compactMode && styles.compactBtn]}
+                            onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
+                            <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markAllPaid')}</Text>
+                          </TouchableOpacity>
+                        </View>
                       ) : (
                         <TouchableOpacity
                           style={[styles.markAllUnpaidBtn, settings.compactMode && styles.compactBtn]}
@@ -765,6 +799,18 @@ export default function TheRunScreen() {
           personId={logPerson.id}
           personName={logPerson.name}
           onClose={() => setLogPerson(null)}
+        />
+      )}
+
+      {payAmountOrder && (
+        <PromptModal
+          visible={!!payAmountOrder}
+          title={t('run.payAmountTitle')}
+          message={t('run.payAmountMsg', { total: payAmountOrder.total.toFixed(2), name: payAmountOrder.personName })}
+          defaultValue={payAmountOrder.total.toFixed(2)}
+          keyboardType="numeric"
+          onCancel={() => setPayAmountOrder(null)}
+          onSubmit={handleCustomPayment}
         />
       )}
     </KeyboardAvoidingView>
@@ -880,8 +926,16 @@ const styles = StyleSheet.create({
   pending: { color: '#ff9800', fontWeight: 'bold', fontSize: 16 },
   settled: { color: '#aaa', fontWeight: 'bold', fontSize: 16 },
   buttonGroup: { alignItems: 'flex-end', flex: 1 },
-  markAllPaidBtn: { backgroundColor: '#2f95dc', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
+  markAllPaidBtn: { backgroundColor: '#28a745', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
   markAllPaidText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  payAmountBtn: {
+    backgroundColor: '#ff9800',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   markAllUnpaidBtn: { backgroundColor: '#444', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
   markAllUnpaidText: { color: '#ccc', fontWeight: 'bold', fontSize: 13 },
   

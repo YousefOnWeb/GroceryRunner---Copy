@@ -26,6 +26,7 @@ export const translations = {
       priceTBD: 'Price TBD',
       today: 'Today',
       tomorrow: 'Tomorrow',
+      invalidAmount: 'Please enter a valid number.',
     },
     run: {
       runLabel: 'Run:',
@@ -56,6 +57,9 @@ export const translations = {
       creditLabel: 'Their money with you: ',
       pendingLabel: 'Awaiting Prices: ',
       settledLabel: 'Settled: ',
+      payAmountTitle: 'Custom Payment',
+      payAmountMsg: 'Order total is ${total}. How much did {name} pay?',
+      paymentAdjustment: 'Payment adjustment for order on {date}',
     },
     addOrder: {
       createTitle: 'Create New Order',
@@ -297,6 +301,7 @@ export const translations = {
       priceTBD: 'السعر غير محدد',
       today: 'اليوم',
       tomorrow: 'غداً',
+      invalidAmount: 'يرجى إدخال رقم صحيح.',
     },
     run: {
       runLabel: 'القائمة:',
@@ -327,6 +332,9 @@ export const translations = {
       creditLabel: 'أموالهم لديك: ',
       pendingLabel: 'في انتظار الأسعار: ',
       settledLabel: 'تمت التسوية: ',
+      payAmountTitle: 'دفع مبلغ مخصص',
+      payAmountMsg: 'إجمالي الطلب هو ${total}. كم دفع {name}؟',
+      paymentAdjustment: 'تعديل الدفع لطلب بتاريخ {date}',
     },
     addOrder: {
       createTitle: 'إنشاء طلب جديد',
