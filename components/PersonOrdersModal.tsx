@@ -200,12 +200,21 @@ export default function PersonOrdersModal({ visible, personId, personName, onClo
                 <View style={styles.orderItems}>
                   {order.items.map((item) => (
                     <View key={item.id} style={styles.itemRow}>
-                      <Text style={[styles.itemText, settings.compactMode && styles.textExtraSmall]}>
-                        {isRTL ? '\u200F•\u00A0' : '• '}{item.quantity}x {item.itemName}
-                      </Text>
-                      <Text style={[styles.itemPrice, settings.compactMode && styles.textExtraSmall]}>
-                        {item.unitPrice !== null ? `$${(item.unitPrice * item.quantity).toFixed(2)}` : t('common.priceTBD')}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, overflow: 'hidden' }}>
+                        <View style={[styles.quantityBadge, settings.compactMode && styles.quantityBadgeCompact]}>
+                          <Text style={[styles.quantityText, settings.compactMode && styles.quantityTextCompact]}>
+                            {item.quantity}x
+                          </Text>
+                        </View>
+                        <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.itemText, settings.compactMode && styles.textExtraSmall, { flexShrink: 1 }]}>
+                          {isRTL ? '\u200F' : ''}{item.itemName}
+                        </Text>
+                      </View>
+                      <View style={[styles.priceBadge, { marginStart: 10 }]}>
+                        <Text style={[styles.itemPrice, settings.compactMode && styles.textExtraSmall]}>
+                          {item.unitPrice !== null ? `$${(item.unitPrice * item.quantity).toFixed(2)}` : t('common.priceTBD')}
+                        </Text>
+                      </View>
                     </View>
                   ))}
                 </View>
@@ -334,6 +343,11 @@ const styles = StyleSheet.create({
   },
   itemText: { color: '#ccc', fontSize: 13 },
   itemPrice: { color: '#888', fontSize: 12 },
+  quantityBadge: { backgroundColor: '#333', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  quantityText: { color: '#ccc', fontWeight: 'bold', fontSize: 12 },
+  quantityBadgeCompact: { paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
+  quantityTextCompact: { fontSize: 10 },
+  priceBadge: { backgroundColor: '#2a2a2a', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -46,10 +46,13 @@ export default function UnknownPriceModal({
             {items.map((item, idx) => (
               <View key={idx} style={styles.itemRow}>
                 <View style={styles.dot} />
-                <Text style={styles.itemText}>
-                  {item.quantity}x {item.itemName}
+                <View style={styles.quantityBadge}>
+                  <Text style={styles.quantityText}>{item.quantity}x</Text>
+                </View>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.itemText, { flexShrink: 1, marginStart: 8 }]}>
+                  {item.itemName}
                 </Text>
-                <Text style={styles.dateText}>{item.orderDate}</Text>
+                <Text style={[styles.dateText, { flexShrink: 0 }]}>{item.orderDate}</Text>
               </View>
             ))}
             {items.length === 0 && (
@@ -117,6 +120,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     flex: 1,
+  },
+  quantityBadge: {
+    backgroundColor: '#333',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  quantityText: {
+    color: '#ccc',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   dateText: {
     fontSize: 12,

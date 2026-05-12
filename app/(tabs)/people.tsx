@@ -425,7 +425,7 @@ export default function PeopleScreen() {
             >
               <View style={styles.info}>
                 <View style={[styles.nameRow, settings.compactMode && styles.nameRowCompact]}>
-                  <Text style={[styles.name, settings.compactMode && styles.nameCompact]}>{person.name}</Text>
+                  <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.name, settings.compactMode && styles.nameCompact, { flexShrink: 1, marginEnd: 10 }]}>{person.name}</Text>
                   <View style={styles.personActions}>
                     <TouchableOpacity onPress={() => setLogPerson({ id: person.id, name: person.name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
                       <FontAwesome name="history" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
@@ -441,10 +441,10 @@ export default function PeopleScreen() {
                   </View>
                 </View>
                 {person.typicalPlace ? (
-                  <Text style={[styles.place, settings.compactMode && styles.textExtraSmall, { alignSelf: 'flex-start' }]}>📍 {person.typicalPlace}</Text>
+                  <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.place, settings.compactMode && styles.textExtraSmall, { alignSelf: 'flex-start' }]}>📍 {person.typicalPlace}</Text>
                 ) : null}
                 {aliases.length > 0 ? (
-                  <Text style={[styles.aliases, settings.compactMode && styles.textExtraSmall, { alignSelf: 'flex-start' }]}>
+                  <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.aliases, settings.compactMode && styles.textExtraSmall, { alignSelf: 'flex-start' }]}>
                     {t('people.aka')} {aliases.join(', ')}
                   </Text>
                 ) : null}

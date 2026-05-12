@@ -275,7 +275,8 @@ export default function AddOrderScreen() {
             <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>{t('addOrder.step1Title')}</Text>
             <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
               <SmartTextInput
-                style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
+                containerStyle={{ flex: 1 }}
+                style={[styles.input, settings.compactMode && styles.inputCompact, { marginBottom: 0 }]}
                 value={personSearchQuery}
                 onChangeText={setPersonSearchQuery}
                 onFocus={() => setActiveSearch('person')}
@@ -298,9 +299,9 @@ export default function AddOrderScreen() {
                   const matchedAlias = getMatchingAlias(p.id);
                   return (
                     <TouchableOpacity key={p.id} style={[styles.gridItemPerson, settings.compactMode && styles.gridItemPersonCompact]} onPress={() => selectPerson(p.id)}>
-                      <Text style={[styles.gridItemName, settings.compactMode && styles.textSmall]}>{p.name}</Text>
+                      <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.gridItemName, settings.compactMode && styles.textSmall]}>{p.name}</Text>
                       {matchedAlias && (
-                        <Text style={styles.gridItemAlias}>({matchedAlias})</Text>
+                        <Text numberOfLines={1} ellipsizeMode="tail" style={styles.gridItemAlias}>({matchedAlias})</Text>
                       )}
                     </TouchableOpacity>
                   );
@@ -310,7 +311,7 @@ export default function AddOrderScreen() {
 
             {!activeSearch && selectedPerson && (
               <View style={[styles.selectedRow, settings.compactMode && styles.selectedRowCompact]}>
-                <Text style={[styles.selectedText, settings.compactMode && styles.textSmall]}>{selectedPerson.name}</Text>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.selectedText, settings.compactMode && styles.textSmall, { flexShrink: 1, marginEnd: 10 }]}>{selectedPerson.name}</Text>
                 <TouchableOpacity onPress={() => { setSelectedPersonId(null); setPersonSearchQuery(''); }}>
                   <Text style={[styles.changeBtnText, settings.compactMode && styles.textExtraSmall]}>{t('addOrder.changeBtn')}</Text>
                 </TouchableOpacity>
@@ -367,7 +368,8 @@ export default function AddOrderScreen() {
             <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>{t('addOrder.step3Title')}</Text>
             <View style={[styles.searchRow, settings.compactMode && styles.searchRowCompact]}>
               <SmartTextInput
-                style={[styles.input, settings.compactMode && styles.inputCompact, { flex: 1, marginBottom: 0 }]}
+                containerStyle={{ flex: 1 }}
+                style={[styles.input, settings.compactMode && styles.inputCompact, { marginBottom: 0 }]}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 onFocus={() => setActiveSearch('item')}
@@ -388,8 +390,8 @@ export default function AddOrderScreen() {
                 const inCart = cart.find((c) => c.item.id === item.id);
                 return (
                   <TouchableOpacity key={item.id} style={[styles.gridItem, settings.compactMode && styles.gridItemCompact]} onPress={() => addToCart(item)}>
-                    <Text style={[styles.gridItemName, settings.compactMode && styles.textSmall]}>{item.name}</Text>
-                    {inCart && <View style={[styles.badge, settings.compactMode && styles.badgeCompact]}><Text>{inCart.quantity}</Text></View>}
+                    <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.gridItemName, settings.compactMode && styles.textSmall]}>{item.name}</Text>
+                    {inCart && <View style={[styles.badge, settings.compactMode && styles.badgeCompact]}><Text style={styles.badgeText}>{inCart.quantity}</Text></View>}
                   </TouchableOpacity>
                 );
               })}
@@ -402,7 +404,7 @@ export default function AddOrderScreen() {
             <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>{t('addOrder.cartTitle')}</Text>
             {cart.map((c) => (
               <View key={c.item.id} style={[styles.cartRow, settings.compactMode && styles.cartRowCompact]}>
-                <Text style={[styles.cartText, settings.compactMode && styles.textSmall]}>{c.item.name}</Text>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.cartText, settings.compactMode && styles.textSmall, { flexShrink: 1, marginEnd: 10 }]}>{c.item.name}</Text>
                 <View style={styles.cartActions}>
                   <TouchableOpacity onPress={() => removeFromCart(c.item.id)} style={[styles.cartBtn, settings.compactMode && styles.cartBtnCompact]}>
                     <FontAwesome name="minus" size={settings.compactMode ? 10 : 12} />
@@ -447,10 +449,11 @@ const styles = StyleSheet.create({
   addButton: { marginStart: 10, backgroundColor: '#2f95dc', padding: 12, borderRadius: 8 },
   addButtonText: { color: '#fff', fontWeight: 'bold' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gridItem: { backgroundColor: '#444', padding: 15, borderRadius: 10, minWidth: '30%' },
-  gridItemPerson: { backgroundColor: '#444', padding: 10, borderRadius: 20 },
+  gridItem: { backgroundColor: '#444', padding: 15, borderRadius: 10, minWidth: '30%', flexShrink: 1, maxWidth: '48%' },
+  gridItemPerson: { backgroundColor: '#444', padding: 10, borderRadius: 20, flexShrink: 1, maxWidth: '48%' },
   gridItemName: { color: '#fff', textAlign: 'center' },
-  badge: { position: 'absolute', top: -5, end: -5, backgroundColor: '#ff4444', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  badge: { position: 'absolute', top: -5, end: -5, backgroundColor: '#ff4444', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  badgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   cartRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   cartText: { fontSize: 16, color: '#fff', textAlign: I18nManager.isRTL ? 'right' : 'left' },
   cartActions: { flexDirection: 'row', alignItems: 'center' },

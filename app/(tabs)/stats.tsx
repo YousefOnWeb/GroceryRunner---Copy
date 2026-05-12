@@ -229,9 +229,9 @@ export default function StatsScreen() {
       >
         <View style={styles.cardContentWrapper}>
           <View style={[styles.itemHeader, settings.compactMode && styles.itemHeaderCompact]}>
-            <View style={{ alignItems: 'flex-start' }}>
-              <Text style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{item.name}</Text>
-              {aliases.length > 0 && <Text style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>{t('people.aka')} {aliases.join(', ')}</Text>}
+            <View style={{ alignItems: 'flex-start', flexShrink: 1, marginEnd: 10 }}>
+              <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{item.name}</Text>
+              {aliases.length > 0 && <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>{t('people.aka')} {aliases.join(', ')}</Text>}
             </View>
             {!selectionMode && (
               <TouchableOpacity onPress={() => handleEditClick(item)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
@@ -271,9 +271,9 @@ export default function StatsScreen() {
       >
         <View style={styles.cardContentWrapper}>
           <View style={[styles.itemHeader, settings.compactMode && styles.itemHeaderCompact]}>
-            <View style={{ alignItems: 'flex-start' }}>
-              <Text style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{name}</Text>
-              {aliases.length > 0 && <Text style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>{t('people.aka')} {aliases.join(', ')}</Text>}
+            <View style={{ alignItems: 'flex-start', flexShrink: 1, marginEnd: 10 }}>
+              <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.itemName, settings.compactMode && styles.itemNameCompact]}>{name}</Text>
+              {aliases.length > 0 && <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.aliasesText, settings.compactMode && styles.textExtraSmall]}>{t('people.aka')} {aliases.join(', ')}</Text>}
             </View>
             {!selectionMode && (
               <TouchableOpacity onPress={() => setEditingStringEntity({ type, name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>

@@ -529,14 +529,19 @@ export default function TheRunScreen() {
                     style={[styles.sourceHeader, settings.compactMode && styles.sourceHeaderCompact]} 
                     onPress={() => toggleSourceCollapse(sourceKey)}
                     activeOpacity={0.7}>
-                    <View style={styles.sourceTitleRow}>
+                    <View style={[styles.sourceTitleRow, { flex: 1 }]}>
                       <FontAwesome 
                         name={isCollapsed ? 'caret-right' : 'caret-down'} 
                         size={settings.compactMode ? 14 : 16} 
                         color="#888" 
                         style={{ width: 15 }} 
                       />
-                      <Text style={[styles.sourceTitle, settings.compactMode && styles.textSmall]}>📍 {source}</Text>
+                      <Text 
+                        numberOfLines={1} 
+                        ellipsizeMode="tail" 
+                        style={[styles.sourceTitle, settings.compactMode && styles.textSmall, { flex: 1 }]}>
+                        📍 {source}
+                      </Text>
                     </View>
                     <Text style={[styles.sourceCost, settings.compactMode && styles.textSmall]}>${sourceTotal.toFixed(2)}</Text>
                   </TouchableOpacity>
@@ -551,14 +556,22 @@ export default function TheRunScreen() {
                         size={settings.compactMode ? 20 : 24}
                         color={checkedItems[ag.item.id] ? '#28a745' : '#ccc'}
                       />
-                      <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1, alignItems: 'center', flexDirection: 'row', gap: 8, overflow: 'hidden' }}>
+                        <View style={[styles.quantityBadge, settings.compactMode && styles.quantityBadgeCompact, checkedItems[ag.item.id] && styles.quantityBadgeCrossed]}>
+                          <Text style={[styles.quantityText, settings.compactMode && styles.quantityTextCompact, checkedItems[ag.item.id] && styles.quantityTextCrossed]}>
+                            {ag.totalQuantity}x
+                          </Text>
+                        </View>
                         <Text
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
                           style={[
                             styles.itemText,
                             settings.compactMode && styles.itemTextCompact,
                             checkedItems[ag.item.id] && styles.itemTextCrossed,
+                            { flexShrink: 1, marginStart: 0 }
                           ]}>
-                          {isRTL ? '\u200F' : ''}{ag.totalQuantity}x {ag.item.name}
+                          {isRTL ? '\u200F' : ''}{ag.item.name}
                         </Text>
                       </View>
                       {ag.totalCost > 0 && (
@@ -621,7 +634,12 @@ export default function TheRunScreen() {
                   color="#8bb8e8" 
                   style={{ width: 20 }} 
                 />
-                <Text style={[styles.deliveryLocationTitle, settings.compactMode && styles.deliveryLocationTitleCompact]}>📍 {group.location}</Text>
+                <Text 
+                  numberOfLines={1} 
+                  ellipsizeMode="tail" 
+                  style={[styles.deliveryLocationTitle, settings.compactMode && styles.deliveryLocationTitleCompact, { flex: 1 }]}>
+                  📍 {group.location}
+                </Text>
               </TouchableOpacity>
 
               {!isCollapsed && filteredOrders.map((po) => (
@@ -650,10 +668,10 @@ export default function TheRunScreen() {
                           style={{ marginEnd: 10 }} 
                         />
                       )}
-                      <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                        <Text style={[styles.personName, settings.compactMode && styles.personNameCompact, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>{po.person.name}</Text>
+                      <View style={{ flex: 1, alignItems: 'flex-start', overflow: 'hidden', paddingEnd: 8 }}>
+                        <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.personName, settings.compactMode && styles.personNameCompact, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>{po.person.name}</Text>
                         {po.deliveryPlace ? (
-                          <Text style={[styles.deliveryPlace, settings.compactMode && styles.textExtraSmall, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>📍 {po.deliveryPlace}</Text>
+                          <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.deliveryPlace, settings.compactMode && styles.textExtraSmall, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>📍 {po.deliveryPlace}</Text>
                         ) : null}
                       </View>
                     </View>
@@ -688,10 +706,24 @@ export default function TheRunScreen() {
                               color={i.isPaid ? '#28a745' : '#ccc'}
                             />
                           </TouchableOpacity>
-                          <View style={[styles.itemInfo, { alignItems: 'flex-start' }]}>
-                            <Text style={[styles.personItemText, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid]}>
-                              {isRTL ? '\u200F•\u00A0' : '• '}{i.quantity}x {i.itemDef?.name} - {i.unitPrice === null ? t('common.priceTBD') : `$${itemCost.toFixed(2)}`}
+                          <View style={[styles.itemInfo, { alignItems: 'center', flexDirection: 'row', gap: 8, flexShrink: 1, overflow: 'hidden' }]}>
+                            <View style={[styles.quantityBadge, settings.compactMode && styles.quantityBadgeCompact, i.isPaid && styles.quantityBadgeCrossed]}>
+                              <Text style={[styles.quantityText, settings.compactMode && styles.quantityTextCompact, i.isPaid && styles.quantityTextCrossed]}>
+                                {i.quantity}x
+                              </Text>
+                            </View>
+                            <Text 
+                              numberOfLines={1} 
+                              ellipsizeMode="tail"
+                              style={[styles.personItemText, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid, { flexShrink: 1 }]}>
+                              {isRTL ? '\u200F' : ''}{i.itemDef?.name}
                             </Text>
+                            <View style={{ flex: 1 }} />
+                            <View style={[styles.priceBadge, i.isPaid && styles.quantityBadgeCrossed]}>
+                              <Text style={[styles.priceText, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid]}>
+                                {i.unitPrice === null ? t('common.priceTBD') : `$${itemCost.toFixed(2)}`}
+                              </Text>
+                            </View>
                           </View>
                         </View>
                       );
@@ -900,6 +932,14 @@ const styles = StyleSheet.create({
   itemText: { fontSize: 18, color: '#fff', marginStart: 10 },
   itemPrice: { fontSize: 14, color: '#aaa', marginStart: 8 },
   itemTextCrossed: { textDecorationLine: 'line-through', color: '#666' },
+  quantityBadge: { backgroundColor: '#333', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  quantityText: { color: '#ccc', fontWeight: 'bold', fontSize: 14 },
+  quantityBadgeCompact: { paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
+  quantityTextCompact: { fontSize: 12 },
+  quantityBadgeCrossed: { backgroundColor: '#222' },
+  quantityTextCrossed: { color: '#666', textDecorationLine: 'line-through' },
+  priceBadge: { backgroundColor: '#2a2a2a', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  priceText: { color: '#aaa', fontSize: 12 },
   emptyText: { color: '#888', fontStyle: 'italic', marginBottom: 20 },
   separator: { height: 1, backgroundColor: '#444', marginVertical: 20 },
   personCard: { backgroundColor: '#222', padding: 15, borderRadius: 10, marginBottom: 15 },
