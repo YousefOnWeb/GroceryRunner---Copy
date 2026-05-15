@@ -50,6 +50,7 @@ export default function AddOrderScreen() {
   const [personModalVisible, setPersonModalVisible] = useState(false);
 
   const [editModeOrderId, setEditModeOrderId] = useState<string | null>(null);
+  const [topItems, setTopItems] = useState<any[]>([]);
 
   const targetDateDb = getLocalDateString(targetDate);
   const existingOrder = useMemo(() => {
@@ -75,6 +76,19 @@ export default function AddOrderScreen() {
       router.setParams({ edit: undefined });
     }
   }, [existingOrder, params.edit, editModeOrderId]);
+
+  React.useEffect(() => {
+    if (selectedPersonId) {
+      api.getTopItemsForPerson(selectedPersonId)
+        .then(setTopItems)
+        .catch(err => {
+          console.error('Error fetching top items:', err);
+          setTopItems([]);
+        });
+    } else {
+      setTopItems([]);
+    }
+  }, [selectedPersonId]);
 
   const personCorpus = useMemo(() => {
     const dbNames = people?.map(p => p.name) || [];
@@ -273,19 +287,29 @@ export default function AddOrderScreen() {
     }
   };
 
-  const filteredCatalog = catalog?.filter((item) => {
+  const filteredCatalog = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-    const aliases = itemAliasesList?.filter(a => a.itemId === item.id).map(a => a.alias) || [];
-    const searchString = [
-      item.name,
-      item.defaultPrice?.toString(),
-      item.source,
-      item.timing,
-      ...aliases
-    ].join(' ').toLowerCase();
-    return searchString.includes(q);
-  }) || [];
+    const baseList = catalog || [];
+
+    if (!q) {
+      // Prioritize top items when query is empty
+      const topIds = new Set(topItems.map(i => i.id));
+      const remaining = baseList.filter(i => !topIds.has(i.id));
+      return [...topItems, ...remaining];
+    }
+
+    return baseList.filter((item) => {
+      const aliases = itemAliasesList?.filter(a => a.itemId === item.id).map(a => a.alias) || [];
+      const searchString = [
+        item.name,
+        item.defaultPrice?.toString(),
+        item.source,
+        item.timing,
+        ...aliases
+      ].join(' ').toLowerCase();
+      return searchString.includes(q);
+    });
+  }, [catalog, searchQuery, itemAliasesList, topItems]);
   
   const exactItemMatch = filteredCatalog.find(i => i.name.toLowerCase() === searchQuery.toLowerCase().trim());
 

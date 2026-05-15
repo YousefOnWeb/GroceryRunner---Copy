@@ -600,6 +600,25 @@ export const api = {
     return rows;
   },
 
+  getTopItemsForPerson: async (personId: string) => {
+    // Efficiently fetch top 10 items for a person using COUNT and GROUP BY
+    const res = await db.select({
+      itemId: orderItems.itemId,
+      count: sql<number>`count(*)`,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .where(eq(orders.personId, personId))
+    .groupBy(orderItems.itemId)
+    .orderBy(sql`count(*) DESC`)
+    .limit(10);
+    
+    if (res.length === 0) return [];
+    
+    const itemIds = res.map(r => r.itemId);
+    return db.select().from(items).where(inArray(items.id, itemIds));
+  },
+
   getDistinctSources: async () => {
     const res = await db.selectDistinct({ source: items.source }).from(items);
     const aliasRes = await db.selectDistinct({ alias: sourceAliases.alias }).from(sourceAliases);
