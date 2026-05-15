@@ -177,19 +177,29 @@ export const api = {
   },
   
   createOrder: async (personId: string, targetDate: string, orderLines: { itemId: string, quantity: number, unitPrice: number | null }[], deliveryPlace?: string | null) => {
+    // 1. Fetch current person balance
+    const person = await db.select({ balance: persons.balance }).from(persons).where(eq(persons.id, personId));
+    const currentBalance = person.length > 0 ? person[0].balance : 0;
+
     const orderId = generateId();
     let totalCost = 0;
     
+    // 2. Calculate total cost (using 0 for unknown prices)
+    orderLines.forEach(line => {
+      totalCost += (line.quantity * (line.unitPrice || 0));
+    });
+
+    // 3. Determine if it's auto-paid (Case A: Credit >= Cost)
+    const shouldAutoPay = totalCost > 0 && currentBalance >= totalCost;
+
     const linesToInsert = orderLines.map(line => {
-      const cost = line.quantity * (line.unitPrice || 0);
-      totalCost += cost;
       return {
         id: generateId(),
         orderId,
         itemId: line.itemId,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
-        isPaid: false,
+        isPaid: shouldAutoPay,
       };
     });
 
@@ -199,7 +209,7 @@ export const api = {
       id: orderId,
       personId,
       targetDate,
-      isPaid: false,
+      isPaid: shouldAutoPay,
       deliveryPlace: finalPlace,
     });
     
@@ -218,7 +228,7 @@ export const api = {
         amount: -totalCost,
         date: new Date().toISOString(),
         type: 'OrderCost',
-        note: `Order for ${targetDate}`,
+        note: `Order for ${targetDate}${shouldAutoPay ? ' (Auto-settled)' : ''}`,
       });
     }
   },
@@ -228,37 +238,43 @@ export const api = {
     const orderInfo = await db.select({ date: orders.targetDate }).from(orders).where(eq(orders.id, orderId));
     const targetDate = orderInfo.length > 0 ? orderInfo[0].date : '';
 
-    // 1. Fetch old unpaid items to revert their debt
+    // 1. Fetch ALL old items to revert their cost deduction
     const oldItems = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-    let oldUnpaidCost = 0;
+    let oldTotalCost = 0;
     oldItems.forEach(oi => {
-      if (!oi.isPaid) {
-        oldUnpaidCost += (oi.quantity * (oi.unitPrice || 0));
-      }
+      oldTotalCost += (oi.quantity * (oi.unitPrice || 0));
     });
 
-    // Revert old unpaid debt (increase balance)
-    if (oldUnpaidCost > 0) {
+    // Revert old debt (increase balance to "pre-order" state for this specific order)
+    if (oldTotalCost > 0) {
       await db.update(persons)
-        .set({ balance: sql`${persons.balance} + ${oldUnpaidCost}` })
+        .set({ balance: sql`${persons.balance} + ${oldTotalCost}` })
         .where(eq(persons.id, personId));
     }
 
     // 2. Delete old items
     await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
 
-    // 3. Insert new items (all unpaid) and calculate new cost
+    // 3. Fetch current "pre-apply" balance to check for auto-settlement
+    const person = await db.select({ balance: persons.balance }).from(persons).where(eq(persons.id, personId));
+    const currentBalance = person.length > 0 ? person[0].balance : 0;
+
+    // 4. Insert new items and calculate new cost
     let newTotalCost = 0;
+    newOrderLines.forEach(line => {
+      newTotalCost += (line.quantity * (line.unitPrice || 0));
+    });
+
+    const shouldAutoPay = newTotalCost > 0 && currentBalance >= newTotalCost;
+
     const linesToInsert = newOrderLines.map(line => {
-      const cost = line.quantity * (line.unitPrice || 0);
-      newTotalCost += cost;
       return {
         id: generateId(),
         orderId,
         itemId: line.itemId,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
-        isPaid: false,
+        isPaid: shouldAutoPay,
       };
     });
 
@@ -287,12 +303,12 @@ export const api = {
         amount: -newTotalCost,
         date: new Date().toISOString(),
         type: 'OrderCost',
-        note: `Order for ${targetDate}`,
+        note: `Order for ${targetDate}${shouldAutoPay ? ' (Auto-settled)' : ''}`,
       });
     }
     
-    // Update deliveryPlace and set order to unpaid
-    const orderUpdates: any = { isPaid: false };
+    // Update deliveryPlace and set order status
+    const orderUpdates: any = { isPaid: shouldAutoPay };
     if (deliveryPlace !== undefined) {
       orderUpdates.deliveryPlace = deliveryPlace ? await api.resolvePlaceByNameOrAlias(deliveryPlace) : null;
     }
@@ -307,20 +323,43 @@ export const api = {
       .where(eq(orderItems.id, itemId));
     const itemName = itemInfo.length > 0 ? `${itemInfo[0].qty}x ${itemInfo[0].name}` : 'Item';
 
+    // 2. Determine if we should consume credit (Case A) or reimburse runner (Case B)
+    const person = await db.select({ balance: persons.balance }).from(persons).where(eq(persons.id, personId));
+    const currentBalance = person.length > 0 ? person[0].balance : 0;
+    const shouldConsumeCredit = cost > 0 && currentBalance >= cost;
+
     await db.update(orderItems).set({ isPaid: true }).where(eq(orderItems.id, itemId));
+    
     if (cost > 0) {
-      await db.update(persons)
-        .set({ balance: sql`${persons.balance} + ${cost}` })
-        .where(eq(persons.id, personId));
-        
-      await db.insert(transactions).values({
-        id: generateId(),
-        personId,
-        amount: cost,
-        date: new Date().toISOString(),
-        type: 'PaymentReceived',
-        note: `Paid: ${itemName}`,
-      });
+      if (shouldConsumeCredit) {
+        // Case A: Person has credit, so we subtract the cost from it
+        await db.update(persons)
+          .set({ balance: sql`${persons.balance} - ${cost}` })
+          .where(eq(persons.id, personId));
+          
+        await db.insert(transactions).values({
+          id: generateId(),
+          personId,
+          amount: -cost,
+          date: new Date().toISOString(),
+          type: 'OrderCost',
+          note: `Paid using credit: ${itemName}`,
+        });
+      } else {
+        // Case B: Reimbursement (normal behavior)
+        await db.update(persons)
+          .set({ balance: sql`${persons.balance} + ${cost}` })
+          .where(eq(persons.id, personId));
+          
+        await db.insert(transactions).values({
+          id: generateId(),
+          personId,
+          amount: cost,
+          date: new Date().toISOString(),
+          type: 'PaymentReceived',
+          note: `Paid: ${itemName}`,
+        });
+      }
     }
   },
 
@@ -336,10 +375,6 @@ export const api = {
     // 2. Revert the balance (decrease it back)
     await db.update(orderItems).set({ isPaid: false }).where(eq(orderItems.id, itemId));
     if (cost > 0) {
-      await db.update(persons)
-        .set({ balance: sql`${persons.balance} - ${cost}` })
-        .where(eq(persons.id, personId));
-        
       // 3. Find and delete the most recent "Paid" transaction for this item
       const recentTx = await db.select({ id: transactions.id })
         .from(transactions)
@@ -352,7 +387,17 @@ export const api = {
         .limit(1);
 
       if (recentTx.length > 0) {
+        // Cash payment case: revert the reimbursement (debt comes back)
+        await db.update(persons)
+          .set({ balance: sql`${persons.balance} - ${cost}` })
+          .where(eq(persons.id, personId));
+          
         await db.delete(transactions).where(eq(transactions.id, recentTx[0].id));
+      } else {
+        // Auto-settled case: revert the credit deduction (credit comes back)
+        await db.update(persons)
+          .set({ balance: sql`${persons.balance} + ${cost}` })
+          .where(eq(persons.id, personId));
       }
     }
   },
@@ -374,22 +419,43 @@ export const api = {
     });
 
     if (idsToUpdate.length > 0) {
+      const person = await db.select({ balance: persons.balance }).from(persons).where(eq(persons.id, personId));
+      const currentBalance = person.length > 0 ? person[0].balance : 0;
+      const shouldConsumeCredit = totalUnpaidCost > 0 && currentBalance >= totalUnpaidCost;
+
       await db.update(orderItems).set({ isPaid: true }).where(inArray(orderItems.id, idsToUpdate));
       await db.update(orders).set({ isPaid: true }).where(eq(orders.id, orderId));
 
       if (totalUnpaidCost > 0) {
-        await db.update(persons)
-          .set({ balance: sql`${persons.balance} + ${totalUnpaidCost}` })
-          .where(eq(persons.id, personId));
-          
-        await db.insert(transactions).values({
-          id: generateId(),
-          personId,
-          amount: totalUnpaidCost,
-          date: new Date().toISOString(),
-          type: 'PaymentReceived',
-          note: `Settled entire order from ${orderDate}`,
-        });
+        if (shouldConsumeCredit) {
+          // Case A: Credit consumption
+          await db.update(persons)
+            .set({ balance: sql`${persons.balance} - ${totalUnpaidCost}` })
+            .where(eq(persons.id, personId));
+            
+          await db.insert(transactions).values({
+            id: generateId(),
+            personId,
+            amount: -totalUnpaidCost,
+            date: new Date().toISOString(),
+            type: 'OrderCost',
+            note: `Settled using credit (Order from ${orderDate})`,
+          });
+        } else {
+          // Case B: Reimbursement
+          await db.update(persons)
+            .set({ balance: sql`${persons.balance} + ${totalUnpaidCost}` })
+            .where(eq(persons.id, personId));
+            
+          await db.insert(transactions).values({
+            id: generateId(),
+            personId,
+            amount: totalUnpaidCost,
+            date: new Date().toISOString(),
+            type: 'PaymentReceived',
+            note: `Settled entire order from ${orderDate}`,
+          });
+        }
       }
     }
   },
@@ -429,10 +495,6 @@ export const api = {
       await db.update(orders).set({ isPaid: false }).where(eq(orders.id, orderId));
 
       if (totalPaidCost > 0) {
-        await db.update(persons)
-          .set({ balance: sql`${persons.balance} - ${totalPaidCost}` })
-          .where(eq(persons.id, personId));
-          
         // Find and delete the most recent "Settled" transaction for this order
         const recentTx = await db.select({ id: transactions.id })
           .from(transactions)
@@ -445,7 +507,17 @@ export const api = {
           .limit(1);
 
         if (recentTx.length > 0) {
+          // Cash payment case: revert the reimbursement (debt comes back)
+          await db.update(persons)
+            .set({ balance: sql`${persons.balance} - ${totalPaidCost}` })
+            .where(eq(persons.id, personId));
+            
           await db.delete(transactions).where(eq(transactions.id, recentTx[0].id));
+        } else {
+          // Auto-settled case: revert the credit deduction (credit comes back)
+          await db.update(persons)
+            .set({ balance: sql`${persons.balance} + ${totalPaidCost}` })
+            .where(eq(persons.id, personId));
         }
       }
     }
