@@ -11,6 +11,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard, I18nManager } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSettings } from '@/utils/settings';
 import { useTranslation } from '@/utils/i18n';
 import SmartTextInput from '@/components/SmartTextInput';
@@ -26,6 +27,8 @@ export default function AddOrderScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
   const { settings } = useSettings();
   const { t } = useTranslation();
+  const params = useLocalSearchParams<{ personId?: string; date?: string; edit?: string }>();
+  const router = useRouter();
 
   const [targetDate, setTargetDate] = useState(getDefaultDate());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -54,6 +57,25 @@ export default function AddOrderScreen() {
     return allOrders.find(o => o.personId === selectedPersonId && o.targetDate === targetDateDb);
   }, [allOrders, selectedPersonId, targetDateDb]);
 
+  React.useEffect(() => {
+    if (params.edit && params.personId && params.date) {
+      const d = new Date(params.date);
+      if (!isNaN(d.getTime())) {
+        setTargetDate(d);
+        setSelectedPersonId(params.personId);
+        setEditModeOrderId(null); // Force reset to allow re-loading
+      }
+    }
+  }, [params.edit, params.personId, params.date]);
+
+  React.useEffect(() => {
+    if (params.edit && existingOrder && !editModeOrderId) {
+      handleLoadExistingOrder();
+      // Clear the edit param so we don't re-trigger on tab switch
+      router.setParams({ edit: undefined });
+    }
+  }, [existingOrder, params.edit, editModeOrderId]);
+
   const personCorpus = useMemo(() => {
     const dbNames = people?.map(p => p.name) || [];
     const dbAliases = allAliases?.map(a => a.alias) || [];
@@ -76,6 +98,37 @@ export default function AddOrderScreen() {
 
   const handleBlur = () => {
     setTimeout(() => setActiveSearch(null), 150);
+  };
+
+  const handleLoadExistingOrder = () => {
+    if (!existingOrder) return;
+    
+    if (existingOrder.isPaid) {
+      Alert.alert(
+        t('addOrder.editPaidTitle'),
+        t('addOrder.editPaidMsg'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('addOrder.markUnpaid'),
+            onPress: async () => {
+              try {
+                await api.markOrderUnpaid(existingOrder.id, existingOrder.personId);
+                loadExistingOrder();
+              } catch (e) {
+                console.error(e);
+              }
+            }
+          },
+          {
+            text: t('addOrder.keepPaid'),
+            onPress: () => loadExistingOrder()
+          }
+        ]
+      );
+    } else {
+      loadExistingOrder();
+    }
   };
 
   const loadExistingOrder = () => {
@@ -133,7 +186,34 @@ export default function AddOrderScreen() {
       return;
     }
 
-    if (cart.length === 0 && !editModeOrderId) {
+    if (cart.length === 0) {
+      if (editModeOrderId) {
+        Alert.alert(
+          t('addOrder.deleteOrder'),
+          t('addOrder.emptyOrderPrompt'),
+          [
+            { text: t('addOrder.keepEditing'), style: 'cancel' },
+            {
+              text: t('common.delete'),
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await api.deleteOrder(editModeOrderId);
+                  setCart([]);
+                  setSelectedPersonId(null);
+                  setPersonSearchQuery('');
+                  setEditModeOrderId(null);
+                  setDeliveryPlace('');
+                } catch (e) {
+                  console.error(e);
+                  Alert.alert(t('common.error'), t('run.failedDelete'));
+                }
+              },
+            },
+          ]
+        );
+        return;
+      }
       Alert.alert(t('common.error'), t('addOrder.errorEmptyCart'));
       return;
     }
@@ -359,7 +439,7 @@ export default function AddOrderScreen() {
         {!activeSearch && existingOrder && editModeOrderId !== existingOrder.id && (
           <View style={styles.warningBanner}>
             <Text style={styles.warningText}>{t('addOrder.warningExists')}</Text>
-            <TouchableOpacity style={styles.loadBtn} onPress={loadExistingOrder}><Text style={styles.loadBtnText}>{t('addOrder.editBtn')}</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.loadBtn} onPress={handleLoadExistingOrder}><Text style={styles.loadBtnText}>{t('addOrder.editBtn')}</Text></TouchableOpacity>
           </View>
         )}
 

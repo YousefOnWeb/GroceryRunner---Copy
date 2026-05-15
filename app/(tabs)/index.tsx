@@ -14,8 +14,8 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View as RNView, KeyboardAvoidingView, AppState, Keyboard, I18nManager } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 export default function TheRunScreen() {
   const [targetDate, setTargetDate] = useState(getDefaultDate());
@@ -44,6 +44,7 @@ export default function TheRunScreen() {
 
   const { settings } = useSettings();
   const { t, isRTL } = useTranslation();
+  const router = useRouter();
 
   const dateOptions = useMemo(() => generateDateOptions(t, t('modals.daysShort')), [t]);
 
@@ -208,18 +209,6 @@ export default function TheRunScreen() {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
   };
 
-  const handleToggleItemPaid = async (itemId: string, personId: string, itemCost: number, isPaid: boolean) => {
-    try {
-      if (isPaid) {
-        await api.markItemUnpaid(itemId, personId, itemCost);
-      } else {
-        await api.markItemPaid(itemId, personId, itemCost);
-      }
-    } catch (e) {
-      console.error(e);
-      Alert.alert(t('common.error'), t('run.failedItemStatus'));
-    }
-  };
 
   const handleMarkAllPaid = async (orderId: string, personId: string) => {
     try {
@@ -314,26 +303,70 @@ export default function TheRunScreen() {
     Alert.alert(t('run.copiedTitle'), t('run.copiedMsg'));
   };
 
-  const handleDeleteOrder = (orderId: string, personName: string) => {
-    Alert.alert(
-      t('run.deleteOrderTitle'),
-      t('run.deleteOrderConfirm', { name: personName }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.deleteOrder(orderId);
-            } catch (e) {
-              console.error(e);
-              Alert.alert(t('common.error'), t('run.failedDelete'));
-            }
+  const handleDeleteOrder = (orderId: string, personName: string, isPaid: boolean) => {
+    if (isPaid) {
+      Alert.alert(
+        t('run.deleteOrderTitle'),
+        t('run.deletePaidOrderConfirm', { name: personName }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('run.deleteOrderCashReturned'),
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await api.deleteOrder(orderId, true); // true = revertCash
+              } catch (e) {
+                console.error(e);
+                Alert.alert(t('common.error'), t('run.failedDelete'));
+              }
+            },
           },
-        },
-      ]
-    );
+          {
+            text: t('run.deleteOrderKeepCredit'),
+            onPress: async () => {
+              try {
+                await api.deleteOrder(orderId, false); // false = keep credit
+              } catch (e) {
+                console.error(e);
+                Alert.alert(t('common.error'), t('run.failedDelete'));
+              }
+            },
+          },
+        ]
+      );
+    } else {
+      Alert.alert(
+        t('run.deleteOrderTitle'),
+        t('run.deleteOrderConfirm', { name: personName }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.delete'),
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await api.deleteOrder(orderId);
+              } catch (e) {
+                console.error(e);
+                Alert.alert(t('common.error'), t('run.failedDelete'));
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
+  
+  const handleEditOrder = (order: any, person: any) => {
+    router.push({
+      pathname: '/add-order',
+      params: { 
+        personId: person.id, 
+        date: order.targetDate,
+        edit: Date.now().toString()
+      }
+    });
   };
 
   const getSourceTotal = (itemsList: { totalCost: number }[]) => {
@@ -678,17 +711,24 @@ export default function TheRunScreen() {
                     <View style={styles.costInfo}>
                       <View style={styles.orderActions}>
                         {!selectionMode && (
-                          <TouchableOpacity onPress={() => handleDeleteOrder(po.order.id, po.person.name)} style={styles.deleteOrderBtn}>
-                            <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#ff4444" />
-                          </TouchableOpacity>
+                          <View style={{ flexDirection: 'row', gap: 15 }}>
+                            <TouchableOpacity onPress={() => handleEditOrder(po.order, po.person)} style={styles.editOrderBtn}>
+                              <FontAwesome name="edit" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteOrder(po.order.id, po.person.name, po.order.isPaid)} style={styles.deleteOrderBtn}>
+                              <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#ff4444" />
+                            </TouchableOpacity>
+                          </View>
                         )}
                         <Text style={[styles.personTotal, settings.compactMode && styles.personTotalCompact]}>
                           ${po.totalCost.toFixed(2)}{po.hasUnknownPriceItems ? ` + ${t('common.priceTBD')}` : ''}
                         </Text>
                       </View>
-                      {po.unpaidCost > 0 && (
-                        <Text style={[styles.unpaidCost, settings.compactMode && styles.textExtraSmall]}>(${po.unpaidCost.toFixed(2)} {t('run.unpaid')})</Text>
-                      )}
+                      <View style={[styles.statusContainer, settings.compactMode && { height: 16 }]}>
+                        <Text style={[styles.statusText, po.unpaidCost > 0 ? styles.statusUnpaid : styles.statusPaid, settings.compactMode && styles.textExtraSmall]}>
+                          {po.hasUnknownPriceItems ? t('run.statusAwaitingPrices') : po.unpaidCost > 0 ? t('run.statusUnpaid') : t('run.statusPaid')}
+                        </Text>
+                      </View>
                     </View>
                   </TouchableOpacity>
 
@@ -697,15 +737,7 @@ export default function TheRunScreen() {
                       const itemCost = (i.unitPrice ?? 0) * i.quantity;
                       return (
                         <View key={i.id} style={[styles.itemRow2, settings.compactMode && styles.itemRow2Compact]}>
-                          <TouchableOpacity
-                            onPress={() => handleToggleItemPaid(i.id, po.person.id, itemCost, i.isPaid)}
-                            style={[styles.itemToggle, settings.compactMode && styles.paddingSmall]}>
-                            <FontAwesome
-                              name={i.isPaid ? 'check-square-o' : 'square-o'}
-                              size={settings.compactMode ? 16 : 18}
-                              color={i.isPaid ? '#28a745' : '#ccc'}
-                            />
-                          </TouchableOpacity>
+                          {/* Individual item checkbox removed as requested */}
                           <View style={[styles.itemInfo, { alignItems: 'center', flexDirection: 'row', gap: 8, flexShrink: 1, overflow: 'hidden' }]}>
                             <View style={[styles.quantityBadge, settings.compactMode && styles.quantityBadgeCompact, i.isPaid && styles.quantityBadgeCrossed]}>
                               <Text style={[styles.quantityText, settings.compactMode && styles.quantityTextCompact, i.isPaid && styles.quantityTextCrossed]}>
@@ -773,14 +805,14 @@ export default function TheRunScreen() {
                           <TouchableOpacity
                             style={[styles.markAllPaidBtn, settings.compactMode && styles.compactBtn]}
                             onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
-                            <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markAllPaid')}</Text>
+                            <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markPaid')}</Text>
                           </TouchableOpacity>
                         </View>
                       ) : (
                         <TouchableOpacity
                           style={[styles.markAllUnpaidBtn, settings.compactMode && styles.compactBtn]}
                           onPress={() => handleMarkAllUnpaid(po.order.id, po.person.id)}>
-                          <Text style={[styles.markAllUnpaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markAllUnpaid')}</Text>
+                          <Text style={[styles.markAllUnpaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.revertLastPayment')}</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -949,8 +981,12 @@ const styles = StyleSheet.create({
   deliveryPlace: { fontSize: 12, color: '#8bb8e8', marginTop: 2, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   costInfo: { alignItems: 'flex-end', flex: 1 },
   orderActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  editOrderBtn: { padding: 4 },
   deleteOrderBtn: { padding: 4 },
-  unpaidCost: { fontSize: 12, color: '#ff9800', fontWeight: 'bold' },
+  statusContainer: { height: 20, justifyContent: 'center' },
+  statusText: { fontSize: 12, fontWeight: 'bold' },
+  statusUnpaid: { color: '#ff9800' },
+  statusPaid: { color: '#28a745' },
   personItems: { marginBottom: 10 },
   itemRow2: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   itemToggle: { padding: 8 },
