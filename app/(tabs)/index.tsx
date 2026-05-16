@@ -472,7 +472,7 @@ export default function TheRunScreen() {
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
                 <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate, t, t('modals.daysShort'))}</Text>
-                <FontAwesome name="calendar" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+                <FontAwesome name="calendar" size={settings.compactMode ? 14 : 16} color="#d4af37" />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleNextDay} style={[styles.navBtn, settings.compactMode && styles.paddingSmall]}>
                 <FontAwesome name={I18nManager.isRTL ? "chevron-left" : "chevron-right"} size={settings.compactMode ? 14 : 16} color="#888" />
@@ -486,7 +486,7 @@ export default function TheRunScreen() {
             </TouchableOpacity>
             <Text style={[styles.headerTitle, settings.compactMode && styles.textSmall]}>{selectedOrders.size} {t('run.selected')}</Text>
             <TouchableOpacity onPress={() => setShowMoveDatePicker(true)} style={[styles.copyBtn, { marginStart: 10 }, settings.compactMode && styles.paddingSmall]}>
-              <FontAwesome name="calendar" size={settings.compactMode ? 18 : 20} color="#2f95dc" />
+              <FontAwesome name="calendar" size={settings.compactMode ? 18 : 20} color="#d4af37" />
             </TouchableOpacity>
             <TouchableOpacity onPress={handleDeleteSelected} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
               <FontAwesome name="trash" size={settings.compactMode ? 18 : 20} color="#ff4444" />
@@ -495,7 +495,7 @@ export default function TheRunScreen() {
         )}
         {!selectionMode && (
           <TouchableOpacity onPress={handleCopyRun} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
-            <FontAwesome name="copy" size={settings.compactMode ? 18 : 20} color="#2f95dc" />
+            <FontAwesome name="copy" size={settings.compactMode ? 18 : 20} color="#d4af37" />
           </TouchableOpacity>
         )}
       </View>
@@ -532,22 +532,29 @@ export default function TheRunScreen() {
               Keyboard.dismiss();
             }}
           >
-            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#d4af37" />
             <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('run.exitSearch')}</Text>
           </TouchableOpacity>
         )}
 
         {!isSearching && (
           <LinearGradient
-            colors={['#daa520', '#ddac2e', '#e0b43c', '#e3bc4a', '#e6c458', '#e9cc66', '#ecd474', '#f0dc82', '#f3e490', '#f6ec9e', '#f9f4ac', '#fdf0b0', '#f9f4ac', '#f6ec9e', '#f3e490', '#f0dc82', '#ecd474', '#e9cc66', '#e6c27a', '#e3bc4a', '#e0b43c', '#ddac2e', '#daa520']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.shoppingListStrip}
+            colors={['#fdf0b0', '#daa520', '#8b6d1b']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.shoppingListStripOuter}
           >
-            <Text style={[styles.shoppingListTitle, settings.compactMode && styles.sectionTitleCompact, { marginBottom: 0 }]}>{t('run.shoppingList')}</Text>
-            {listTotal > 0 && (
-              <Text style={[styles.shoppingListTotal, settings.compactMode && styles.sectionTitleCompact, { marginBottom: 0 }]}>${listTotal.toFixed(2)}</Text>
-            )}
+            <LinearGradient
+              colors={['#daa520', '#ddac2e', '#e0b43c', '#e3bc4a', '#e6c458', '#e9cc66', '#ecd474', '#f0dc82', '#f3e490', '#f6ec9e', '#f9f4ac', '#fdf0b0', '#f9f4ac', '#f6ec9e', '#f3e490', '#f0dc82', '#ecd474', '#e9cc66', '#e6c27a', '#e3bc4a', '#e0b43c', '#ddac2e', '#daa520']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.shoppingListStripInner}
+            >
+              <Text style={[styles.shoppingListTitle, settings.compactMode && styles.sectionTitleCompact, { marginBottom: 0 }]}>{t('run.shoppingList')}</Text>
+              {listTotal > 0 && (
+                <Text style={[styles.shoppingListTotal, settings.compactMode && styles.sectionTitleCompact, { marginBottom: 0 }]}>${listTotal.toFixed(2)}</Text>
+              )}
+            </LinearGradient>
           </LinearGradient>
         )}
 
@@ -577,11 +584,11 @@ export default function TheRunScreen() {
                       <Text
                         numberOfLines={1}
                         ellipsizeMode="tail"
-                        style={[styles.sourceTitle, settings.compactMode && styles.textSmall, { flex: 1 }]}>
+                        style={[styles.sourceTitle, settings.compactMode && styles.sourceTitleCompact, { flex: 1 }]}>
                         📍 {source}
                       </Text>
                     </View>
-                    <Text style={[styles.sourceCost, settings.compactMode && styles.textSmall]}>${sourceTotal.toFixed(2)}</Text>
+                    <Text style={[styles.sourceCost, settings.compactMode && styles.sourceTitleCompact]}>${sourceTotal.toFixed(2)}</Text>
                   </TouchableOpacity>
 
                   {!isCollapsed && itemsList.map((ag) => (
@@ -720,7 +727,7 @@ export default function TheRunScreen() {
                         {!selectionMode && (
                           <View style={{ flexDirection: 'row', gap: 15 }}>
                             <TouchableOpacity onPress={() => handleEditOrder(po.order, po.person)} style={styles.editOrderBtn}>
-                              <FontAwesome name="edit" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+                              <FontAwesome name="edit" size={settings.compactMode ? 14 : 16} color="#d4af37" />
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => handleDeleteOrder(po.order.id, po.person.name, po.order.isPaid)} style={styles.deleteOrderBtn}>
                               <FontAwesome name="trash" size={settings.compactMode ? 14 : 16} color="#ff4444" />
@@ -808,23 +815,37 @@ export default function TheRunScreen() {
                           <TouchableOpacity
                             onPress={() => setPayAmountOrder({ id: po.order.id, personId: po.person.id, total: po.totalCost, personName: po.person.name })}>
                             <LinearGradient
-                              colors={['#daa520', '#ddac2e', '#e0b43c', '#e3bc4a', '#e6c458', '#e9cc66', '#ecd474', '#f0dc82', '#f3e490', '#f6ec9e', '#f9f4ac', '#fdf0b0', '#f9f4ac', '#f6ec9e', '#f3e490', '#f0dc82', '#ecd474', '#e9cc66', '#e6c27a', '#e3bc4a', '#e0b43c', '#ddac2e', '#daa520']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 0 }}
-                              style={[styles.payAmountBtn, settings.compactMode && styles.compactBtn]}
+                              colors={['#fdf0b0', '#daa520', '#8b6d1b']}
+                              start={{ x: 0.5, y: 0 }}
+                              end={{ x: 0.5, y: 1 }}
+                              style={[styles.paymentBtnOuter, settings.compactMode && { borderRadius: 5 }]}
                             >
-                              <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.payAmountTitle')}</Text>
+                              <LinearGradient
+                                colors={['#daa520', '#ddac2e', '#e0b43c', '#e3bc4a', '#e6c458', '#e9cc66', '#ecd474', '#f0dc82', '#f3e490', '#f6ec9e', '#f9f4ac', '#fdf0b0', '#f9f4ac', '#f6ec9e', '#f3e490', '#f0dc82', '#ecd474', '#e9cc66', '#e6c27a', '#e3bc4a', '#e0b43c', '#ddac2e', '#daa520']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={[styles.paymentBtnInner, settings.compactMode && styles.compactBtn]}
+                              >
+                                <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.payAmountTitle')}</Text>
+                              </LinearGradient>
                             </LinearGradient>
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
                             <LinearGradient
-                              colors={['#daa520', '#ddac2e', '#e0b43c', '#e3bc4a', '#e6c458', '#e9cc66', '#ecd474', '#f0dc82', '#f3e490', '#f6ec9e', '#f9f4ac', '#fdf0b0', '#f9f4ac', '#f6ec9e', '#f3e490', '#f0dc82', '#ecd474', '#e9cc66', '#e6c27a', '#e3bc4a', '#e0b43c', '#ddac2e', '#daa520']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 0 }}
-                              style={[styles.markAllPaidBtn, settings.compactMode && styles.compactBtn]}
+                              colors={['#fdf0b0', '#daa520', '#8b6d1b']}
+                              start={{ x: 0.5, y: 0 }}
+                              end={{ x: 0.5, y: 1 }}
+                              style={[styles.paymentBtnOuter, settings.compactMode && { borderRadius: 5 }]}
                             >
-                              <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markPaid')}</Text>
+                              <LinearGradient
+                                colors={['#daa520', '#ddac2e', '#e0b43c', '#e3bc4a', '#e6c458', '#e9cc66', '#ecd474', '#f0dc82', '#f3e490', '#f6ec9e', '#f9f4ac', '#fdf0b0', '#f9f4ac', '#f6ec9e', '#f3e490', '#f0dc82', '#ecd474', '#e9cc66', '#e6c27a', '#e3bc4a', '#e0b43c', '#ddac2e', '#daa520']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={[styles.paymentBtnInner, settings.compactMode && styles.compactBtn]}
+                              >
+                                <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markPaid')}</Text>
+                              </LinearGradient>
                             </LinearGradient>
                           </TouchableOpacity>
                         </View>
@@ -938,17 +959,25 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 10 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTotal: { fontSize: 18, fontWeight: 'bold', color: '#ffeb3b' },
-  shoppingListStrip: {
+  sectionTotal: { fontSize: 18, fontWeight: 'bold', color: '#d4af37' },
+  shoppingListStripOuter: {
+    marginBottom: 15,
+    borderRadius: 12,
+    padding: 1.5,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  shoppingListStripInner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
     paddingHorizontal: 15,
-    paddingVertical: 7,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#daa520',
+    paddingVertical: 10,
+    borderRadius: 11,
     width: '100%',
   },
   shoppingListTitle: {
@@ -1006,12 +1035,12 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   exitSearchText: {
-    color: '#2f95dc',
+    color: '#d4af37',
     fontWeight: 'bold',
   },
   sourceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sourceTitle: { fontSize: 16, color: '#d4af37', fontWeight: 'bold' },
-  sourceCost: { fontSize: 16, fontWeight: 'bold', color: '#ffeb3b' },
+  sourceTitle: { fontSize: 22, color: '#d4af37', fontWeight: 'bold' },
+  sourceCost: { fontSize: 22, fontWeight: 'bold', color: '#d4af37' },
   itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, paddingVertical: 2 },
   itemPriceContainer: { width: 60, alignItems: 'flex-end' },
   itemText: { fontSize: 16, color: '#fff' },
@@ -1030,7 +1059,7 @@ const styles = StyleSheet.create({
   personCard: { backgroundColor: '#222', padding: 15, borderRadius: 10, marginBottom: 15 },
   personHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   personName: { fontSize: 18, fontWeight: 'bold', color: '#fff', textAlign: I18nManager.isRTL ? 'right' : 'left' },
-  personTotal: { fontSize: 18, fontWeight: 'bold', color: '#ffeb3b', textAlign: I18nManager.isRTL ? 'left' : 'right' },
+  personTotal: { fontSize: 18, fontWeight: 'bold', color: '#d4af37', textAlign: I18nManager.isRTL ? 'left' : 'right' },
   deliveryPlace: { fontSize: 12, color: '#8bb8e8', marginTop: 2, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   costInfo: { alignItems: 'flex-end', flex: 1 },
   orderActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -1038,7 +1067,7 @@ const styles = StyleSheet.create({
   deleteOrderBtn: { padding: 4 },
   statusContainer: { height: 20, justifyContent: 'center' },
   statusText: { fontSize: 12, fontWeight: 'bold' },
-  statusUnpaid: { color: '#d4af37' },
+  statusUnpaid: { color: '#ffa726' },
   statusPaid: { color: '#5c8a6a' },
   personItems: { marginBottom: 10 },
   itemRow2: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
@@ -1054,22 +1083,27 @@ const styles = StyleSheet.create({
   notesBtn: { padding: 4 },
   debtLabel: { color: '#a24949' },
   creditLabel: { color: '#5c8a6a' },
-  pendingLabel: { color: '#d4af37' },
+  pendingLabel: { color: '#ffa726' },
   settledLabel: { color: '#8c8c8c' },
   debt: { color: '#a24949', fontWeight: 'bold', fontSize: 16 },
   credit: { color: '#5c8a6a', fontWeight: 'bold', fontSize: 16 },
-  pending: { color: '#d4af37', fontWeight: 'bold', fontSize: 16 },
+  pending: { color: '#ffa726', fontWeight: 'bold', fontSize: 16 },
   settled: { color: '#8c8c8c', fontWeight: 'bold', fontSize: 16 },
   buttonGroup: { alignItems: 'flex-end', flex: 1 },
-  markAllPaidBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 5 },
-  markAllPaidText: { color: '#1a1a1a', fontWeight: 'bold', fontSize: 13 },
-  payAmountBtn: {
+  paymentBtnOuter: {
+    borderRadius: 5,
+    padding: 1.5,
+  },
+  paymentBtnInner: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 5,
+    borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  markAllPaidBtn: { },
+  markAllPaidText: { color: '#1a1a1a', fontWeight: 'bold', fontSize: 13 },
+  payAmountBtn: { },
   markAllUnpaidBtn: { backgroundColor: '#2a2a2a', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 5, borderWidth: 1, borderColor: '#444' },
   markAllUnpaidText: { color: '#d4af37', fontWeight: 'bold', fontSize: 13 },
 
@@ -1081,6 +1115,7 @@ const styles = StyleSheet.create({
   timingTitleCompact: { fontSize: 15, marginBottom: 3 },
   sourceGroupCompact: { marginBottom: 8 },
   sourceHeaderCompact: { paddingVertical: 2 },
+  sourceTitleCompact: { fontSize: 15 },
   itemRowCompact: { marginBottom: 4 },
   itemTextCompact: { fontSize: 15 },
   deliveriesHeaderCompact: { marginBottom: 8 },

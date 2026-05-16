@@ -41,10 +41,10 @@ export default function TabLayout() {
         },
         headerTintColor: '#d4af37',
         headerTitleStyle: {
-          fontFamily: 'serif',
-          fontWeight: 'bold',
-          fontSize: 22,
-          letterSpacing: 2,
+          fontFamily: 'Cinzel-Bold',
+          fontSize: 28,
+          letterSpacing: 3,
+          textTransform: 'uppercase',
         },
         headerTitleAlign: 'center',
         // Disable the static render of the header on web
