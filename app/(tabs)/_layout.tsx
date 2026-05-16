@@ -23,7 +23,30 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: '#d4af37',
+        tabBarInactiveTintColor: '#888',
+        tabBarStyle: {
+          backgroundColor: '#1a1a1a',
+          borderTopColor: '#333',
+          paddingBottom: 5,
+          paddingTop: 5,
+          height: 60,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+        },
+        headerStyle: {
+          backgroundColor: '#1a1a1a',
+        },
+        headerTintColor: '#d4af37',
+        headerTitleStyle: {
+          fontFamily: 'serif',
+          fontWeight: 'bold',
+          fontSize: 22,
+          letterSpacing: 2,
+        },
+        headerTitleAlign: 'center',
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
@@ -60,7 +83,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: t('tabs.settings') || 'Settings',
-          tabBarIcon: ({ color }) => <TabBarIcon name="cog" color={color} />,
+          tabBarIcon: ({ color }) => <TabBarIcon name="sliders" color={color} />,
         }}
       />
     </Tabs>

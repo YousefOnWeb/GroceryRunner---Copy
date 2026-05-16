@@ -4,7 +4,7 @@ export const translations = {
   en: {
     tabs: {
       active: 'The Run',
-      stats: 'Stats & Dict',
+      stats: 'Insights',
       people: 'People',
       addOrder: 'Add Order',
       settings: 'Settings',
@@ -36,9 +36,9 @@ export const translations = {
       movedOrders: 'Moved {count} order(s) to {date}',
       failedMove: 'Failed to move orders',
       exitSearch: 'Exit Search Mode',
-      shoppingList: '🛍️ The Shopping List',
+      shoppingList: 'THE SHOPPING LIST',
       total: 'Total:',
-      deliveries: '🚚 Deliveries & Payments',
+      deliveries: 'DELIVERIES & PAYMENTS',
       searchPerson: 'Search person or location...',
       unpaid: 'unpaid',
       markPaid: 'Mark as Paid',
@@ -300,7 +300,7 @@ export const translations = {
   ar: {
     tabs: {
       active: 'القائمة',
-      stats: 'الإحصائيات والقاموس',
+      stats: 'الرؤى',
       people: 'الأشخاص',
       addOrder: 'إضافة طلب',
       settings: 'الإعدادات',
@@ -332,9 +332,9 @@ export const translations = {
       movedOrders: 'تم نقل {count} طلب إلى {date}',
       failedMove: 'فشل في نقل الطلبات',
       exitSearch: 'الخروج من وضع البحث',
-      shoppingList: '🛍️ قائمة التسوق',
+      shoppingList: 'قائمة التسوق',
       total: 'المجموع:',
-      deliveries: '🚚 التوصيلات والمدفوعات',
+      deliveries: 'التوصيلات والمدفوعات',
       searchPerson: 'ابحث عن شخص أو مكان...',
       unpaid: 'غير مدفوع',
       markPaid: 'تحديد كمدفوع',

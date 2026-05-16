@@ -1,21 +1,21 @@
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import DropdownSelect from '@/components/DropdownSelect';
-import UnknownPriceModal from '@/components/UnknownPriceModal';
 import CreditLogModal from '@/components/CreditLogModal';
-import { Text, View } from '@/components/Themed';
 import PromptModal from '@/components/PromptModal';
+import { Text, View } from '@/components/Themed';
+import UnknownPriceModal from '@/components/UnknownPriceModal';
 import { db } from '@/db';
 import { api } from '@/db/api';
 import { items, orderItems, orders, persons } from '@/db/schema';
-import { extractDateValue, formatDateLabel, generateDateOptions, getDefaultDate, getLocalDateString } from '@/utils/dates';
-import { useSettings } from '@/utils/settings';
+import { formatDateLabel, generateDateOptions, getDefaultDate, getLocalDateString } from '@/utils/dates';
 import { useTranslation } from '@/utils/i18n';
+import { useSettings } from '@/utils/settings';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View as RNView, KeyboardAvoidingView, AppState, Keyboard, I18nManager } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, AppState, I18nManager, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 
 export default function TheRunScreen() {
   const [targetDate, setTargetDate] = useState(getDefaultDate());
@@ -94,7 +94,7 @@ export default function TheRunScreen() {
         const itemDef = catalog.find((c) => c.id === oi.itemId);
         const cost = (oi.unitPrice ?? 0) * oi.quantity;
         totalCost += cost;
-        
+
         if (!oi.isPaid) {
           unpaidCost += cost;
           hasUnpaidItems = true;
@@ -113,15 +113,15 @@ export default function TheRunScreen() {
       });
 
       if (person) {
-        pOrders[person.id] = { 
-          person, 
-          order, 
-          items: orderDetails, 
-          totalCost, 
-          unpaidCost, 
+        pOrders[person.id] = {
+          person,
+          order,
+          items: orderDetails,
+          totalCost,
+          unpaidCost,
           hasUnpaidItems,
           hasUnknownPriceItems,
-          deliveryPlace: order.deliveryPlace || person.typicalPlace 
+          deliveryPlace: order.deliveryPlace || person.typicalPlace
         };
       }
     });
@@ -245,7 +245,7 @@ export default function TheRunScreen() {
       } else {
         await api.markOrderPaid(orderId, personId);
       }
-      
+
       const diff = markAllPast ? paidAmount : paidAmount - orderTotal;
       if (Math.abs(diff) > 0.001 || (markAllPast && paidAmount !== 0)) {
         const dateStr = getLocalDateString(targetDate);
@@ -289,12 +289,12 @@ export default function TheRunScreen() {
           text += `    • ${i.quantity}x ${i.itemDef?.name} - ${cost} ${i.isPaid ? '✅' : '❌'}\n`;
         });
         text += `    Total: $${po.totalCost.toFixed(2)}${po.hasUnknownPriceItems ? ' + TBD' : ''}\n`;
-        
+
         let balText = '';
         if (po.person.balance < 0) balText = `You are owed: $${Math.abs(po.person.balance).toFixed(2)}`;
         else if (po.person.balance > 0) balText = `You owe them: $${po.person.balance.toFixed(2)}`;
         else balText = po.hasUnknownPriceItems ? 'Awaiting Prices' : 'Settled';
-        
+
         text += `    Balance: ${balText}\n`;
       });
     });
@@ -357,12 +357,12 @@ export default function TheRunScreen() {
       );
     }
   };
-  
+
   const handleEditOrder = (order: any, person: any) => {
     router.push({
       pathname: '/add-order',
-      params: { 
-        personId: person.id, 
+      params: {
+        personId: person.id,
         date: order.targetDate,
         edit: Date.now().toString()
       }
@@ -457,8 +457,8 @@ export default function TheRunScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
@@ -518,17 +518,17 @@ export default function TheRunScreen() {
         />
       )}
 
-      <ScrollView 
-        style={[styles.content, settings.compactMode && styles.contentCompact]}
-        contentContainerStyle={{ paddingBottom: 100 }}
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, settings.compactMode && styles.contentCompact, { paddingBottom: 100 }]}
         keyboardShouldPersistTaps="handled"
       >
         {isSearching && (
-          <TouchableOpacity 
-            style={[styles.exitSearchBtn, settings.compactMode && styles.exitSearchBtnCompact]} 
-            onPress={() => { 
-              setIsSearching(false); 
-              setSearchQuery(''); 
+          <TouchableOpacity
+            style={[styles.exitSearchBtn, settings.compactMode && styles.exitSearchBtnCompact]}
+            onPress={() => {
+              setIsSearching(false);
+              setSearchQuery('');
               Keyboard.dismiss();
             }}
           >
@@ -538,12 +538,17 @@ export default function TheRunScreen() {
         )}
 
         {!isSearching && (
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, settings.compactMode && styles.sectionTitleCompact]}>{t('run.shoppingList')}</Text>
+          <LinearGradient
+            colors={['#daa520', '#ddac2e', '#e0b43c', '#e3bc4a', '#e6c458', '#e9cc66', '#ecd474', '#f0dc82', '#f3e490', '#f6ec9e', '#f9f4ac', '#fdf0b0', '#f9f4ac', '#f6ec9e', '#f3e490', '#f0dc82', '#ecd474', '#e9cc66', '#e6c27a', '#e3bc4a', '#e0b43c', '#ddac2e', '#daa520']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.shoppingListStrip}
+          >
+            <Text style={[styles.shoppingListTitle, settings.compactMode && styles.sectionTitleCompact, { marginBottom: 0 }]}>{t('run.shoppingList')}</Text>
             {listTotal > 0 && (
-              <Text style={[styles.sectionTotal, settings.compactMode && styles.textSmall]}>{t('run.total')} ${listTotal.toFixed(2)}</Text>
+              <Text style={[styles.shoppingListTotal, settings.compactMode && styles.sectionTitleCompact, { marginBottom: 0 }]}>${listTotal.toFixed(2)}</Text>
             )}
-          </View>
+          </LinearGradient>
         )}
 
         {!isSearching && Object.entries(aggregatedItems).map(([timingKey, sources]) => (
@@ -555,44 +560,44 @@ export default function TheRunScreen() {
               const sourceTotal = getSourceTotal(itemsList);
               const sourceKey = `${timingKey}-${source}`;
               const isCollapsed = collapsedSources[sourceKey];
-              
+
               return (
                 <View key={source} style={[styles.sourceGroup, settings.compactMode && styles.sourceGroupCompact]}>
-                  <TouchableOpacity 
-                    style={[styles.sourceHeader, settings.compactMode && styles.sourceHeaderCompact]} 
+                  <TouchableOpacity
+                    style={[styles.sourceHeader, settings.compactMode && styles.sourceHeaderCompact]}
                     onPress={() => toggleSourceCollapse(sourceKey)}
                     activeOpacity={0.7}>
                     <View style={[styles.sourceTitleRow, { flex: 1 }]}>
-                      <FontAwesome 
-                        name={isCollapsed ? 'caret-right' : 'caret-down'} 
-                        size={settings.compactMode ? 14 : 16} 
-                        color="#888" 
-                        style={{ width: 15 }} 
+                      <FontAwesome
+                        name={isCollapsed ? 'caret-right' : 'caret-down'}
+                        size={settings.compactMode ? 14 : 16}
+                        color="#888"
+                        style={{ width: 15 }}
                       />
-                      <Text 
-                        numberOfLines={1} 
-                        ellipsizeMode="tail" 
+                      <Text
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                         style={[styles.sourceTitle, settings.compactMode && styles.textSmall, { flex: 1 }]}>
                         📍 {source}
                       </Text>
                     </View>
                     <Text style={[styles.sourceCost, settings.compactMode && styles.textSmall]}>${sourceTotal.toFixed(2)}</Text>
                   </TouchableOpacity>
-                  
+
                   {!isCollapsed && itemsList.map((ag) => (
                     <TouchableOpacity
                       key={ag.item.id}
                       style={[styles.itemRow, settings.compactMode && styles.itemRowCompact]}
                       onPress={() => toggleCheck(ag.item.id)}>
                       <FontAwesome
-                        name={checkedItems[ag.item.id] ? 'check-square-o' : 'square-o'}
+                        name={checkedItems[ag.item.id] ? 'check-square' : 'square-o'}
                         size={settings.compactMode ? 20 : 24}
-                        color={checkedItems[ag.item.id] ? '#28a745' : '#ccc'}
+                        color={checkedItems[ag.item.id] ? '#d4af37' : '#d4af37'}
                       />
-                      <View style={{ flex: 1, alignItems: 'center', flexDirection: 'row', gap: 8, overflow: 'hidden' }}>
+                      <View style={{ flex: 1, alignItems: 'center', flexDirection: 'row', gap: 8, overflow: 'hidden', marginStart: 10 }}>
                         <View style={[styles.quantityBadge, settings.compactMode && styles.quantityBadgeCompact, checkedItems[ag.item.id] && styles.quantityBadgeCrossed]}>
                           <Text style={[styles.quantityText, settings.compactMode && styles.quantityTextCompact, checkedItems[ag.item.id] && styles.quantityTextCrossed]}>
-                            {ag.totalQuantity}x
+                            x{ag.totalQuantity}
                           </Text>
                         </View>
                         <Text
@@ -607,15 +612,17 @@ export default function TheRunScreen() {
                           {isRTL ? '\u200F' : ''}{ag.item.name}
                         </Text>
                       </View>
-                      {ag.totalCost > 0 && (
-                        <Text style={[
-                          styles.itemPrice,
-                          settings.compactMode && styles.textSmall,
-                          checkedItems[ag.item.id] && styles.itemTextCrossed,
-                        ]}>
-                          ${ag.totalCost.toFixed(2)}
-                        </Text>
-                      )}
+                      <View style={styles.itemPriceContainer}>
+                        {ag.totalCost > 0 && (
+                          <Text style={[
+                            styles.itemPrice,
+                            settings.compactMode && styles.textSmall,
+                            checkedItems[ag.item.id] && styles.itemTextCrossed,
+                          ]}>
+                            ${ag.totalCost.toFixed(2)}
+                          </Text>
+                        )}
+                      </View>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -657,19 +664,19 @@ export default function TheRunScreen() {
           const isCollapsed = collapsedLocations[group.location];
           return (
             <View key={group.location} style={[styles.locationGroup, settings.compactMode && styles.locationGroupCompact]}>
-              <TouchableOpacity 
-                style={[styles.locationHeaderRow, settings.compactMode && styles.locationHeaderRowCompact]} 
+              <TouchableOpacity
+                style={[styles.locationHeaderRow, settings.compactMode && styles.locationHeaderRowCompact]}
                 onPress={() => toggleLocationCollapse(group.location)}
                 activeOpacity={0.7}>
-                <FontAwesome 
-                  name={isCollapsed ? 'caret-right' : 'caret-down'} 
-                  size={settings.compactMode ? 16 : 20} 
-                  color="#8bb8e8" 
-                  style={{ width: 20 }} 
+                <FontAwesome
+                  name={isCollapsed ? 'caret-right' : 'caret-down'}
+                  size={settings.compactMode ? 16 : 20}
+                  color="#8bb8e8"
+                  style={{ width: 20 }}
                 />
-                <Text 
-                  numberOfLines={1} 
-                  ellipsizeMode="tail" 
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
                   style={[styles.deliveryLocationTitle, settings.compactMode && styles.deliveryLocationTitleCompact, { flex: 1 }]}>
                   📍 {group.location}
                 </Text>
@@ -677,7 +684,7 @@ export default function TheRunScreen() {
 
               {!isCollapsed && filteredOrders.map((po) => (
                 <View key={po.person.id} style={[styles.personCard, settings.compactMode && styles.personCardCompact, selectionMode && selectedOrders.has(po.order.id) && { borderColor: '#2f95dc', borderWidth: 1 }]}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     activeOpacity={0.8}
                     onLongPress={() => {
                       if (!selectionMode) {
@@ -694,11 +701,11 @@ export default function TheRunScreen() {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                       {selectionMode && (
-                        <FontAwesome 
-                          name={selectedOrders.has(po.order.id) ? 'check-square-o' : 'square-o'} 
-                          size={settings.compactMode ? 20 : 24} 
-                          color={selectedOrders.has(po.order.id) ? '#2f95dc' : '#888'} 
-                          style={{ marginEnd: 10 }} 
+                        <FontAwesome
+                          name={selectedOrders.has(po.order.id) ? 'check-square-o' : 'square-o'}
+                          size={settings.compactMode ? 20 : 24}
+                          color={selectedOrders.has(po.order.id) ? '#2f95dc' : '#888'}
+                          style={{ marginEnd: 10 }}
                         />
                       )}
                       <View style={{ flex: 1, alignItems: 'flex-start', overflow: 'hidden', paddingEnd: 8 }}>
@@ -741,21 +748,22 @@ export default function TheRunScreen() {
                           <View style={[styles.itemInfo, { alignItems: 'center', flexDirection: 'row', gap: 8, flexShrink: 1, overflow: 'hidden' }]}>
                             <View style={[styles.quantityBadge, settings.compactMode && styles.quantityBadgeCompact, i.isPaid && styles.quantityBadgeCrossed]}>
                               <Text style={[styles.quantityText, settings.compactMode && styles.quantityTextCompact, i.isPaid && styles.quantityTextCrossed]}>
-                                {i.quantity}x
+                                x{i.quantity}
                               </Text>
                             </View>
-                            <Text 
-                              numberOfLines={1} 
+                            <Text
+                              numberOfLines={1}
                               ellipsizeMode="tail"
-                              style={[styles.personItemText, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid, { flexShrink: 1 }]}>
+                              style={[styles.itemText, { flexShrink: 1, marginStart: 0 }, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid]}>
                               {isRTL ? '\u200F' : ''}{i.itemDef?.name}
                             </Text>
-                            <View style={{ flex: 1 }} />
-                            <View style={[styles.priceBadge, i.isPaid && styles.quantityBadgeCrossed]}>
-                              <Text style={[styles.priceText, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid]}>
-                                {i.unitPrice === null ? t('common.priceTBD') : `$${itemCost.toFixed(2)}`}
-                              </Text>
-                            </View>
+                          </View>
+                          <View style={styles.itemPriceContainer}>
+                            {i.unitPrice === null ? (
+                              <Text style={[styles.itemPrice, { color: '#ffeb3b', fontStyle: 'italic' }, settings.compactMode && styles.textExtraSmall]}>{t('common.priceTBD')}</Text>
+                            ) : itemCost > 0 ? (
+                              <Text style={[styles.itemPrice, settings.compactMode && styles.textExtraSmall, i.isPaid && styles.personItemPaid]}>${itemCost.toFixed(2)}</Text>
+                            ) : null}
                           </View>
                         </View>
                       );
@@ -769,10 +777,10 @@ export default function TheRunScreen() {
                           {po.person.balance < 0
                             ? t('run.debtLabel')
                             : po.person.balance > 0
-                            ? t('run.creditLabel')
-                            : po.hasUnknownPriceItems
-                            ? t('run.pendingLabel')
-                            : t('run.settledLabel')}
+                              ? t('run.creditLabel')
+                              : po.hasUnknownPriceItems
+                                ? t('run.pendingLabel')
+                                : t('run.settledLabel')}
                         </Text>
                         {po.hasUnknownPriceItems && (
                           <TouchableOpacity
@@ -786,7 +794,7 @@ export default function TheRunScreen() {
                         <Text style={[po.person.balance < 0 ? styles.debt : po.person.balance > 0 ? styles.credit : po.hasUnknownPriceItems ? styles.pending : styles.settled, settings.compactMode && styles.personTotalCompact]}>
                           ${Math.abs(po.person.balance).toFixed(2)}
                         </Text>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           onPress={() => setLogPerson({ id: po.person.id, name: po.person.name })}
                           style={[styles.historyBtn, settings.compactMode && styles.paddingSmall]}
                         >
@@ -798,14 +806,26 @@ export default function TheRunScreen() {
                       {po.hasUnpaidItems ? (
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <TouchableOpacity
-                            style={[styles.payAmountBtn, settings.compactMode && styles.compactBtn]}
                             onPress={() => setPayAmountOrder({ id: po.order.id, personId: po.person.id, total: po.totalCost, personName: po.person.name })}>
-                            <FontAwesome name="money" size={settings.compactMode ? 14 : 16} color="#fff" />
+                            <LinearGradient
+                              colors={['#daa520', '#ddac2e', '#e0b43c', '#e3bc4a', '#e6c458', '#e9cc66', '#ecd474', '#f0dc82', '#f3e490', '#f6ec9e', '#f9f4ac', '#fdf0b0', '#f9f4ac', '#f6ec9e', '#f3e490', '#f0dc82', '#ecd474', '#e9cc66', '#e6c27a', '#e3bc4a', '#e0b43c', '#ddac2e', '#daa520']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={[styles.payAmountBtn, settings.compactMode && styles.compactBtn]}
+                            >
+                              <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.payAmountTitle')}</Text>
+                            </LinearGradient>
                           </TouchableOpacity>
                           <TouchableOpacity
-                            style={[styles.markAllPaidBtn, settings.compactMode && styles.compactBtn]}
                             onPress={() => handleMarkAllPaid(po.order.id, po.person.id)}>
-                            <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markPaid')}</Text>
+                            <LinearGradient
+                              colors={['#daa520', '#ddac2e', '#e0b43c', '#e3bc4a', '#e6c458', '#e9cc66', '#ecd474', '#f0dc82', '#f3e490', '#f6ec9e', '#f9f4ac', '#fdf0b0', '#f9f4ac', '#f6ec9e', '#f3e490', '#f0dc82', '#ecd474', '#e9cc66', '#e6c27a', '#e3bc4a', '#e0b43c', '#ddac2e', '#daa520']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={[styles.markAllPaidBtn, settings.compactMode && styles.compactBtn]}
+                            >
+                              <Text style={[styles.markAllPaidText, settings.compactMode && styles.textExtraSmall]}>{t('run.markPaid')}</Text>
+                            </LinearGradient>
                           </TouchableOpacity>
                         </View>
                       ) : (
@@ -888,13 +908,13 @@ export default function TheRunScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111' },
+  container: { flex: 1, backgroundColor: '#1a1a1a' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 15,
-    backgroundColor: '#222',
+    backgroundColor: '#1a1a1a',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
   dateDisplay: {
@@ -919,6 +939,28 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 10 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionTotal: { fontSize: 18, fontWeight: 'bold', color: '#ffeb3b' },
+  shoppingListStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 15,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#daa520',
+    width: '100%',
+  },
+  shoppingListTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  shoppingListTotal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+  },
   searchInput: {
     backgroundColor: '#333',
     color: '#fff',
@@ -933,13 +975,23 @@ const styles = StyleSheet.create({
   deliveryLocationTitle: { fontSize: 18, fontWeight: 'bold', color: '#8bb8e8', marginStart: 5 },
   timingGroup: { marginBottom: 15 },
   timingTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginBottom: 5 },
-  sourceGroup: { marginStart: 10, marginBottom: 12 },
+  sourceGroup: {
+    backgroundColor: '#222',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+    marginBottom: 15,
+    padding: 12,
+    overflow: 'hidden'
+  },
   sourceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
-    marginVertical: 15,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    paddingBottom: 8,
   },
   exitSearchBtn: {
     flexDirection: 'row',
@@ -958,19 +1010,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   sourceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sourceTitle: { fontSize: 16, color: '#aaa' },
+  sourceTitle: { fontSize: 16, color: '#d4af37', fontWeight: 'bold' },
   sourceCost: { fontSize: 16, fontWeight: 'bold', color: '#ffeb3b' },
-  itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginStart: 10 },
-  itemText: { fontSize: 18, color: '#fff', marginStart: 10 },
-  itemPrice: { fontSize: 14, color: '#aaa', marginStart: 8 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, paddingVertical: 2 },
+  itemPriceContainer: { width: 60, alignItems: 'flex-end' },
+  itemText: { fontSize: 16, color: '#fff' },
+  itemPrice: { fontSize: 14, color: '#aaa', fontWeight: '500' },
   itemTextCrossed: { textDecorationLine: 'line-through', color: '#666' },
-  quantityBadge: { backgroundColor: '#333', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  quantityText: { color: '#ccc', fontWeight: 'bold', fontSize: 14 },
+  quantityBadge: { paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4 },
+  quantityText: { color: '#aaa', fontWeight: 'bold', fontSize: 12 },
   quantityBadgeCompact: { paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
   quantityTextCompact: { fontSize: 12 },
-  quantityBadgeCrossed: { backgroundColor: '#222' },
+  quantityBadgeCrossed: { opacity: 0.7 },
   quantityTextCrossed: { color: '#666', textDecorationLine: 'line-through' },
-  priceBadge: { backgroundColor: '#2a2a2a', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  priceBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   priceText: { color: '#aaa', fontSize: 12 },
   emptyText: { color: '#888', fontStyle: 'italic', marginBottom: 20 },
   separator: { height: 1, backgroundColor: '#444', marginVertical: 20 },
@@ -985,49 +1038,48 @@ const styles = StyleSheet.create({
   deleteOrderBtn: { padding: 4 },
   statusContainer: { height: 20, justifyContent: 'center' },
   statusText: { fontSize: 12, fontWeight: 'bold' },
-  statusUnpaid: { color: '#ff9800' },
-  statusPaid: { color: '#28a745' },
+  statusUnpaid: { color: '#d4af37' },
+  statusPaid: { color: '#5c8a6a' },
   personItems: { marginBottom: 10 },
   itemRow2: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   itemToggle: { padding: 8 },
   itemInfo: { flex: 1 },
   personItemText: { color: '#ccc', fontSize: 14, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   personItemPaid: { textDecorationLine: 'line-through', color: '#666' },
-  personFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#555', paddingTop: 10 },
+  personFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#333', paddingTop: 10 },
   balanceHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   balanceValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   historyBtn: { padding: 4 },
   balanceLabel: { fontSize: 12, fontWeight: '600', marginBottom: 3 },
   notesBtn: { padding: 4 },
-  debtLabel: { color: '#ff4444' },
-  creditLabel: { color: '#00C851' },
-  pendingLabel: { color: '#ff9800' },
-  settledLabel: { color: '#aaa' },
-  debt: { color: '#ff4444', fontWeight: 'bold', fontSize: 16 },
-  credit: { color: '#00C851', fontWeight: 'bold', fontSize: 16 },
-  pending: { color: '#ff9800', fontWeight: 'bold', fontSize: 16 },
-  settled: { color: '#aaa', fontWeight: 'bold', fontSize: 16 },
+  debtLabel: { color: '#a24949' },
+  creditLabel: { color: '#5c8a6a' },
+  pendingLabel: { color: '#d4af37' },
+  settledLabel: { color: '#8c8c8c' },
+  debt: { color: '#a24949', fontWeight: 'bold', fontSize: 16 },
+  credit: { color: '#5c8a6a', fontWeight: 'bold', fontSize: 16 },
+  pending: { color: '#d4af37', fontWeight: 'bold', fontSize: 16 },
+  settled: { color: '#8c8c8c', fontWeight: 'bold', fontSize: 16 },
   buttonGroup: { alignItems: 'flex-end', flex: 1 },
-  markAllPaidBtn: { backgroundColor: '#28a745', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
-  markAllPaidText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  markAllPaidBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 5 },
+  markAllPaidText: { color: '#1a1a1a', fontWeight: 'bold', fontSize: 13 },
   payAmountBtn: {
-    backgroundColor: '#ff9800',
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  markAllUnpaidBtn: { backgroundColor: '#444', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
-  markAllUnpaidText: { color: '#ccc', fontWeight: 'bold', fontSize: 13 },
-  
+  markAllUnpaidBtn: { backgroundColor: '#2a2a2a', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 5, borderWidth: 1, borderColor: '#444' },
+  markAllUnpaidText: { color: '#d4af37', fontWeight: 'bold', fontSize: 13 },
+
   // Compact Modifiers
   headerCompact: { padding: 8 },
   dateDisplayCompact: { paddingVertical: 4, paddingHorizontal: 8 },
   contentCompact: { padding: 8 },
   sectionTitleCompact: { fontSize: 18, marginBottom: 5 },
   timingTitleCompact: { fontSize: 15, marginBottom: 3 },
-  sourceGroupCompact: { marginBottom: 8, marginStart: 5 },
+  sourceGroupCompact: { marginBottom: 8 },
   sourceHeaderCompact: { paddingVertical: 2 },
   itemRowCompact: { marginBottom: 4 },
   itemTextCompact: { fontSize: 15 },
