@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useTranslation } from '@/utils/i18n';
+import { ACCENT_GOLD } from '@/constants/Colors';
 
 interface UnknownPriceModalProps {
   visible: boolean;
@@ -143,7 +144,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   closeBtn: {
-    backgroundColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',

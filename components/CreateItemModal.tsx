@@ -11,6 +11,7 @@ import { db } from '@/db';
 import { items } from '@/db/schema';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useTranslation } from '@/utils/i18n';
+import { ACCENT_GOLD } from '@/constants/Colors';
 
 const EMPTY_ARRAY: any[] = [];
 
@@ -148,7 +149,7 @@ export default function CreateItemModal({
                 Keyboard.dismiss();
               }}
             >
-              <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+              <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color={ACCENT_GOLD} />
               <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('common.exitFocusMode')}</Text>
             </TouchableOpacity>
           )}
@@ -281,7 +282,7 @@ export default function CreateItemModal({
                   <View style={styles.correctionHeader}>
                     <Text style={[styles.label, { marginTop: 0 }, settings.compactMode && styles.textExtraSmall]}>{t('modals.updateModeLabel')}</Text>
                     <TouchableOpacity onPress={showPriceHelp} style={styles.helpBtn}>
-                      <FontAwesome name="question-circle" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                      <FontAwesome name="question-circle" size={settings.compactMode ? 14 : 18} color={ACCENT_GOLD} />
                     </TouchableOpacity>
                   </View>
                   <View style={styles.modeToggleRow}>
@@ -391,7 +392,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#444',
   },
   suggestionText: {
-    color: '#2f95dc',
+    color: ACCENT_GOLD,
     fontSize: 14,
     textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
@@ -426,7 +427,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   addAliasBtn: {
-    backgroundColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
     padding: 12,
     borderRadius: 8,
   },
@@ -495,7 +496,7 @@ const styles = StyleSheet.create({
   },
   modeBtnActive: {
     backgroundColor: '#333',
-    borderColor: '#2f95dc',
+    borderColor: ACCENT_GOLD,
   },
   modeBtnActiveCorrection: {
     backgroundColor: '#333',
@@ -535,7 +536,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   exitSearchText: {
-    color: '#2f95dc',
+    color: ACCENT_GOLD,
     fontWeight: 'bold',
   },
 });

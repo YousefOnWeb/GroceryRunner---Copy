@@ -16,6 +16,7 @@ import { useSettings } from '@/utils/settings';
 import { useTranslation } from '@/utils/i18n';
 import SmartTextInput from '@/components/SmartTextInput';
 import { COMMON_GROCERY_CORPUS, COMMON_NAMES_CORPUS } from '@/utils/textMatching';
+import { ACCENT_GOLD, LIGHT_GOLD } from '@/constants/Colors';
 
 export default function AddOrderScreen() {
   const { data: people } = useLiveQuery(db.select().from(persons));
@@ -369,7 +370,7 @@ export default function AddOrderScreen() {
               Keyboard.dismiss();
             }}
           >
-            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color={ACCENT_GOLD} />
             <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('addOrder.exitSearch')}</Text>
           </TouchableOpacity>
         )}
@@ -429,7 +430,7 @@ export default function AddOrderScreen() {
             <Text style={[styles.sectionTitle, settings.compactMode && styles.textSmall]}>{t('addOrder.step2Title')}</Text>
             <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.dateDisplay, settings.compactMode && styles.dateDisplayCompact]}>
               <Text style={[styles.dateDisplayText, settings.compactMode && styles.textSmall]}>{formatDateLabel(targetDate, t, t('modals.daysShort'))}</Text>
-              <FontAwesome name="calendar" size={16} color="#2f95dc" />
+              <FontAwesome name="calendar" size={16} color={ACCENT_GOLD} />
             </TouchableOpacity>
           </View>
         )}
@@ -546,11 +547,11 @@ const styles = StyleSheet.create({
   section: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#333' },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#fff' },
   selectedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#333', padding: 12, borderRadius: 8 },
-  selectedText: { color: '#2f95dc', fontSize: 18, fontWeight: 'bold' },
+  selectedText: { color: ACCENT_GOLD, fontSize: 18, fontWeight: 'bold' },
   changeBtnText: { color: '#aaa', fontSize: 14 },
   input: { backgroundColor: '#333', color: '#fff', padding: 12, borderRadius: 8, fontSize: 16, marginBottom: 10, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  addButton: { marginStart: 10, backgroundColor: '#2f95dc', padding: 12, borderRadius: 8 },
+  addButton: { marginStart: 10, backgroundColor: ACCENT_GOLD, padding: 12, borderRadius: 8 },
   addButtonText: { color: '#fff', fontWeight: 'bold' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   gridItem: { backgroundColor: '#444', padding: 15, borderRadius: 10, minWidth: '30%', flexShrink: 1, maxWidth: '48%' },
@@ -572,12 +573,12 @@ const styles = StyleSheet.create({
   dateDisplay: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#333', padding: 12, borderRadius: 8, gap: 10 },
   dateDisplayText: { color: '#fff', fontSize: 16 },
   exitSearchBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 15, backgroundColor: '#1a1a1a', borderBottomWidth: 1, borderBottomColor: '#333' },
-  exitSearchText: { color: '#2f95dc', fontWeight: 'bold' },
+  exitSearchText: { color: ACCENT_GOLD, fontWeight: 'bold' },
   exitSearchBtnCompact: { padding: 8 },
   suggestionsContainer: { backgroundColor: '#222', borderRadius: 8, padding: 5, marginTop: 5 },
   suggestionItem: { padding: 10 },
   suggestionText: { color: '#fff' },
-  gridItemAlias: { color: '#8bb8e8', textAlign: 'center', fontSize: 11, fontStyle: 'italic', marginTop: 2 },
+  gridItemAlias: { color: LIGHT_GOLD, textAlign: 'center', fontSize: 11, fontStyle: 'italic', marginTop: 2 },
   sectionCompact: { padding: 10 },
   inputCompact: { padding: 8, fontSize: 14 },
   searchRowCompact: { marginBottom: 5 },

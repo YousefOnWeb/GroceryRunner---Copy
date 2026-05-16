@@ -15,6 +15,7 @@ import { ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput, KeyboardAvo
 import * as Clipboard from 'expo-clipboard';
 import { useSettings } from '@/utils/settings';
 import { useTranslation } from '@/utils/i18n';
+import { ACCENT_GOLD, LIGHT_GOLD } from '@/constants/Colors';
 
 interface EditState {
   personId: string;
@@ -286,7 +287,7 @@ export default function PeopleScreen() {
               Keyboard.dismiss();
             }}
           >
-            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color={ACCENT_GOLD} />
             <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('addOrder.exitSearch')}</Text>
           </TouchableOpacity>
         )}
@@ -296,7 +297,7 @@ export default function PeopleScreen() {
             <Text style={[styles.title, settings.compactMode && styles.titleCompact]}>{t('people.title')}</Text>
             <View style={styles.headerActions}>
               <TouchableOpacity onPress={handleCopyPeople} style={[styles.copyBtn, settings.compactMode && styles.paddingSmall]}>
-                <FontAwesome name="copy" size={settings.compactMode ? 16 : 20} color="#2f95dc" />
+                <FontAwesome name="copy" size={settings.compactMode ? 16 : 20} color={ACCENT_GOLD} />
               </TouchableOpacity>
               <TouchableOpacity style={[styles.addBtn, settings.compactMode && styles.addBtnCompact]} onPress={() => setCreateModalVisible(true)}>
                 <FontAwesome name="plus" size={settings.compactMode ? 12 : 16} color="#fff" />
@@ -428,14 +429,14 @@ export default function PeopleScreen() {
                   <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.name, settings.compactMode && styles.nameCompact, { flexShrink: 1, marginEnd: 10 }]}>{person.name}</Text>
                   <View style={styles.personActions}>
                     <TouchableOpacity onPress={() => setLogPerson({ id: person.id, name: person.name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
-                      <FontAwesome name="history" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                      <FontAwesome name="history" size={settings.compactMode ? 14 : 18} color={ACCENT_GOLD} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setOrdersPerson({ id: person.id, name: person.name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
-                      <FontAwesome name="shopping-cart" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                      <FontAwesome name="shopping-cart" size={settings.compactMode ? 14 : 18} color={ACCENT_GOLD} />
                     </TouchableOpacity>
                     {!selectionMode && (
                       <TouchableOpacity onPress={() => handleEditPress(person)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
-                        <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                        <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color={ACCENT_GOLD} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -467,7 +468,7 @@ export default function PeopleScreen() {
                   <FontAwesome 
                     name={isSelected ? "check-circle" : "circle-thin"} 
                     size={24} 
-                    color={isSelected ? "#2f95dc" : "#888"} 
+                    color={isSelected ? ACCENT_GOLD : "#888"} 
                   />
                 </View>
               )}
@@ -566,7 +567,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 8,
@@ -582,7 +583,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardSelected: {
-    borderColor: '#2f95dc',
+    borderColor: ACCENT_GOLD,
     borderWidth: 2,
     backgroundColor: 'rgba(47, 149, 220, 0.1)',
   },
@@ -600,7 +601,7 @@ const styles = StyleSheet.create({
   },
   place: {
     fontSize: 13,
-    color: '#8bb8e8',
+    color: LIGHT_GOLD,
     marginBottom: 3,
     textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
@@ -640,7 +641,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   exitSearchText: {
-    color: '#2f95dc',
+    color: ACCENT_GOLD,
     fontWeight: 'bold',
   },
   
@@ -725,8 +726,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   sortBtnActive: {
-    backgroundColor: '#2f95dc',
-    borderColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
+    borderColor: ACCENT_GOLD,
   },
   sortBtnText: {
     color: '#888',

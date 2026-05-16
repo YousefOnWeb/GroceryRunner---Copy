@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, StyleSheet, TouchableOpacity, View, ScrollView, TextInput } from 'react-native';
 import { Text } from '@/components/Themed';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { ACCENT_GOLD } from '@/constants/Colors';
 
 interface DropdownSelectProps {
   label?: string;
@@ -48,7 +49,7 @@ export default function DropdownSelect({
                   <Text style={[styles.optionText, value === opt && styles.optionSelected]}>
                     {opt}
                   </Text>
-                  {value === opt && <FontAwesome name="check" size={16} color="#2f95dc" />}
+                  {value === opt && <FontAwesome name="check" size={16} color={ACCENT_GOLD} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
     color: '#ccc',
   },
   optionSelected: {
-    color: '#2f95dc',
+    color: ACCENT_GOLD,
     fontWeight: 'bold',
   },
   customContainer: {
@@ -159,7 +160,7 @@ const styles = StyleSheet.create({
     borderColor: '#444',
   },
   customBtn: {
-    backgroundColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
     justifyContent: 'center',
     paddingHorizontal: 15,
     borderRadius: 8,

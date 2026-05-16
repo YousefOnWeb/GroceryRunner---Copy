@@ -11,6 +11,7 @@ import EditStringEntityModal from '@/components/EditStringEntityModal';
 import MergeModal from '@/components/MergeModal';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useTranslation } from '@/utils/i18n';
+import { ACCENT_GOLD } from '@/constants/Colors';
 
 const EMPTY_ARRAY: any[] = [];
 
@@ -235,7 +236,7 @@ export default function StatsScreen() {
             </View>
             {!selectionMode && (
               <TouchableOpacity onPress={() => handleEditClick(item)} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
-                <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color={ACCENT_GOLD} />
               </TouchableOpacity>
             )}
           </View>
@@ -248,7 +249,7 @@ export default function StatsScreen() {
 
         {selectionMode && (
           <View style={styles.checkboxContainer}>
-            <FontAwesome name={isSelected ? "check-circle" : "circle-thin"} size={24} color={isSelected ? "#2f95dc" : "#888"} />
+            <FontAwesome name={isSelected ? "check-circle" : "circle-thin"} size={24} color={isSelected ? ACCENT_GOLD : "#888"} />
           </View>
         )}
       </TouchableOpacity>
@@ -277,7 +278,7 @@ export default function StatsScreen() {
             </View>
             {!selectionMode && (
               <TouchableOpacity onPress={() => setEditingStringEntity({ type, name })} style={[styles.iconBtn, settings.compactMode && styles.paddingSmall]}>
-                <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color="#2f95dc" />
+                <FontAwesome name="pencil" size={settings.compactMode ? 14 : 18} color={ACCENT_GOLD} />
               </TouchableOpacity>
             )}
           </View>
@@ -285,7 +286,7 @@ export default function StatsScreen() {
 
         {selectionMode && (
           <View style={styles.checkboxContainer}>
-            <FontAwesome name={isSelected ? "check-circle" : "circle-thin"} size={24} color={isSelected ? "#2f95dc" : "#888"} />
+            <FontAwesome name={isSelected ? "check-circle" : "circle-thin"} size={24} color={isSelected ? ACCENT_GOLD : "#888"} />
           </View>
         )}
       </TouchableOpacity>
@@ -385,7 +386,7 @@ export default function StatsScreen() {
               Keyboard.dismiss();
             }}
           >
-            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+            <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color={ACCENT_GOLD} />
             <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('addOrder.exitSearch')}</Text>
           </TouchableOpacity>
         )}
@@ -570,7 +571,7 @@ const styles = StyleSheet.create({
   statsCard: { backgroundColor: '#333', padding: 15, borderRadius: 10, marginBottom: 20 },
   statText: { fontSize: 16, color: '#ccc', marginBottom: 5, textAlign: I18nManager.isRTL ? 'right' : 'left' },
   highlight: { color: '#ffeb3b', fontWeight: 'bold', fontSize: 18, textAlign: I18nManager.isRTL ? 'right' : 'left' },
-  subTitle: { fontSize: 18, fontWeight: 'bold', color: '#2f95dc', marginTop: 15, marginBottom: 10 },
+  subTitle: { fontSize: 18, fontWeight: 'bold', color: ACCENT_GOLD, marginTop: 15, marginBottom: 10 },
   listItem: { color: '#ddd', fontSize: 15, marginStart: 10, marginBottom: 5, textAlign: 'left' },
   separator: { height: 1, backgroundColor: '#555', marginVertical: 20 },
   helperText: { color: '#888', fontSize: 13, textAlign: 'center', marginBottom: 15, fontStyle: 'italic' },
@@ -589,7 +590,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   exitSearchText: {
-    color: '#2f95dc',
+    color: ACCENT_GOLD,
     fontWeight: 'bold',
   },
   
@@ -598,7 +599,7 @@ const styles = StyleSheet.create({
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },
   tabBtnActive: { backgroundColor: '#333' },
   tabText: { color: '#888', fontWeight: 'bold', fontSize: 16 },
-  tabTextActive: { color: '#2f95dc' },
+  tabTextActive: { color: ACCENT_GOLD },
   
   selectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, backgroundColor: '#333', padding: 15, borderRadius: 10 },
   selectionLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
@@ -611,7 +612,7 @@ const styles = StyleSheet.create({
   dictionarySearch: { backgroundColor: '#333', color: '#fff', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, fontSize: 16, width: '100%', marginBottom: 5 },
   
   itemCard: { backgroundColor: '#222', padding: 15, borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardSelected: { borderColor: '#2f95dc', borderWidth: 2, backgroundColor: 'rgba(47, 149, 220, 0.1)' },
+  cardSelected: { borderColor: ACCENT_GOLD, borderWidth: 2, backgroundColor: 'rgba(47, 149, 220, 0.1)' },
   cardContentWrapper: { flex: 1 },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 },
   itemName: { fontSize: 18, fontWeight: 'bold', color: '#fff', textAlign: I18nManager.isRTL ? 'right' : 'left' },
@@ -642,7 +643,7 @@ const styles = StyleSheet.create({
   sortLabel: { color: '#666', fontSize: 12, fontWeight: 'bold' },
   sortBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#333', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#444', gap: 6 },
   sortBtnCompact: { paddingHorizontal: 8, paddingVertical: 4, gap: 4 },
-  sortBtnActive: { backgroundColor: '#2f95dc', borderColor: '#2f95dc' },
+  sortBtnActive: { backgroundColor: ACCENT_GOLD, borderColor: ACCENT_GOLD },
   sortBtnText: { color: '#888', fontSize: 12, fontWeight: '600' },
   sortBtnTextActive: { color: '#fff' },
   dictionarySearchRow: { marginBottom: 8 },

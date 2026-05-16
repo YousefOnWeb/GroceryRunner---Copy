@@ -3,6 +3,7 @@ import { StyleSheet, Modal, View, TextInput, TouchableOpacity, I18nManager, Pres
 import { Text } from '@/components/Themed';
 import { useTranslation } from '@/utils/i18n';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { ACCENT_GOLD } from '@/constants/Colors';
 
 interface PromptModalProps {
   visible: boolean;
@@ -64,7 +65,7 @@ export default function PromptModal({
               <FontAwesome 
                 name={toggleActive ? 'check-square-o' : 'square-o'} 
                 size={20} 
-                color={toggleActive ? '#2f95dc' : '#888'} 
+                color={toggleActive ? ACCENT_GOLD : '#888'} 
               />
               <Text style={styles.toggleLabel}>{toggleLabel}</Text>
             </Pressable>
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   submitBtn: {
-    backgroundColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,

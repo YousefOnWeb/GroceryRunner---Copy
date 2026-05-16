@@ -10,6 +10,7 @@ import { COMMON_NAMES_CORPUS } from '@/utils/textMatching';
 import { db } from '@/db';
 import { persons } from '@/db/schema';
 import { useTranslation } from '@/utils/i18n';
+import { ACCENT_GOLD } from '@/constants/Colors';
 
 interface PersonModalProps {
   visible: boolean;
@@ -190,7 +191,7 @@ export default function PersonModal({
                 Keyboard.dismiss();
               }}
             >
-              <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color="#2f95dc" />
+              <FontAwesome name={I18nManager.isRTL ? "chevron-right" : "chevron-left"} size={settings.compactMode ? 12 : 14} color={ACCENT_GOLD} />
               <Text style={[styles.exitSearchText, settings.compactMode && styles.textSmall]}>{t('common.exitFocusMode')}</Text>
             </TouchableOpacity>
           )}
@@ -341,7 +342,7 @@ export default function PersonModal({
                 style={[styles.logLinkBtn, settings.compactMode && styles.logLinkBtnCompact]} 
                 onPress={() => setLogVisible(true)}
               >
-                <FontAwesome name="history" size={settings.compactMode ? 14 : 16} color="#2f95dc" />
+                <FontAwesome name="history" size={settings.compactMode ? 14 : 16} color={ACCENT_GOLD} />
                 <Text style={[styles.logLinkText, settings.compactMode && styles.textSmall]}>{t('modals.viewCreditLog')}</Text>
               </TouchableOpacity>
             </>
@@ -444,7 +445,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#444',
   },
   suggestionText: {
-    color: '#2f95dc',
+    color: ACCENT_GOLD,
     fontSize: 14,
     textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
@@ -472,7 +473,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   addAliasBtn: {
-    backgroundColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
     padding: 12,
     borderRadius: 8,
   },
@@ -565,7 +566,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   logLinkText: {
-    color: '#2f95dc',
+    color: ACCENT_GOLD,
     fontWeight: '600',
   },
   titleCompact: { fontSize: 18, marginBottom: 12 },
@@ -588,7 +589,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   exitSearchText: {
-    color: '#2f95dc',
+    color: ACCENT_GOLD,
     fontWeight: 'bold',
   },
 });

@@ -5,6 +5,7 @@ import { api } from '@/db/api';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSettings } from '@/utils/settings';
 import { useTranslation } from '@/utils/i18n';
+import { ACCENT_GOLD } from '@/constants/Colors';
 
 interface CreditLogModalProps {
   visible: boolean;
@@ -64,7 +65,7 @@ export default function CreditLogModal({ visible, personId, personName, onClose 
           </View>
 
           {loading ? (
-            <ActivityIndicator size="large" color="#2f95dc" style={{ margin: 20 }} />
+            <ActivityIndicator size="large" color={ACCENT_GOLD} style={{ margin: 20 }} />
           ) : (
             <ScrollView style={styles.logList} contentContainerStyle={styles.logListContent}>
               {logs.map((log) => (

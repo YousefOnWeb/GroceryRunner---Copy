@@ -6,6 +6,7 @@ import { orders, orderItems, items } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { ACCENT_GOLD, LIGHT_GOLD } from '@/constants/Colors';
 import { useSettings } from '@/utils/settings';
 import { useTranslation } from '@/utils/i18n';
 import { formatDateLabel } from '@/utils/dates';
@@ -293,8 +294,8 @@ const styles = StyleSheet.create({
     borderColor: '#444',
   },
   sortTabActive: {
-    backgroundColor: '#2f95dc',
-    borderColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
+    borderColor: ACCENT_GOLD,
   },
   sortTabText: {
     color: '#aaa',
@@ -325,7 +326,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   orderDate: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  orderPlace: { color: '#8bb8e8', fontSize: 12, marginTop: 2 },
+  orderPlace: { color: LIGHT_GOLD, fontSize: 12, marginTop: 2 },
   orderStatusRow: { alignItems: 'flex-end' },
   statusBadge: {
     paddingHorizontal: 8,

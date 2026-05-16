@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { useTranslation } from '@/utils/i18n';
+import { ACCENT_GOLD } from '@/constants/Colors';
 
 const SHOW_DEV_SECTION = true; // Toggle this manually to show/hide the dev section
 
@@ -182,7 +183,7 @@ export default function SettingsScreen() {
           <Switch
             value={settings.compactMode}
             onValueChange={(val) => updateSetting('compactMode', val)}
-            trackColor={{ false: '#555', true: '#2f95dc' }}
+            trackColor={{ false: '#555', true: ACCENT_GOLD }}
             thumbColor={settings.compactMode ? '#fff' : '#ccc'}
           />
         </View>
@@ -246,7 +247,7 @@ export default function SettingsScreen() {
           <Switch
             value={settings.groupByFreshness}
             onValueChange={(val) => updateSetting('groupByFreshness', val)}
-            trackColor={{ false: '#555', true: '#2f95dc' }}
+            trackColor={{ false: '#555', true: ACCENT_GOLD }}
             thumbColor={settings.groupByFreshness ? '#fff' : '#ccc'}
           />
         </View>
@@ -450,7 +451,7 @@ export default function SettingsScreen() {
                     <Switch
                       value={seedOptions.seedOrders}
                       onValueChange={(val) => setSeedOptions(s => ({ ...s, seedOrders: val }))}
-                      trackColor={{ false: '#555', true: '#2f95dc' }}
+                      trackColor={{ false: '#555', true: ACCENT_GOLD }}
                       thumbColor={seedOptions.seedOrders ? '#fff' : '#ccc'}
                     />
                   </View>
@@ -499,7 +500,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2f95dc',
+    color: ACCENT_GOLD,
     marginBottom: 4,
     textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
@@ -509,7 +510,7 @@ const styles = StyleSheet.create({
     textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   editButton: {
-    backgroundColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -570,7 +571,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 8,
   },
-  closeButtonText: { color: '#2f95dc', fontSize: 16, fontWeight: 'bold' },
+  closeButtonText: { color: ACCENT_GOLD, fontSize: 16, fontWeight: 'bold' },
   draggableRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -602,7 +603,7 @@ const styles = StyleSheet.create({
   numberInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 15 },
   numberBtn: { backgroundColor: '#444', padding: 8, borderRadius: 6 },
   numberText: { color: '#fff', fontSize: 18, fontWeight: 'bold', minWidth: 30, textAlign: 'center' },
-  seedConfirmBtn: { backgroundColor: '#2f95dc', padding: 15, borderRadius: 12, alignItems: 'center' },
+  seedConfirmBtn: { backgroundColor: ACCENT_GOLD, padding: 15, borderRadius: 12, alignItems: 'center' },
   seedConfirmText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   actionButton: {
     backgroundColor: '#28a745',
@@ -638,8 +639,8 @@ const styles = StyleSheet.create({
     borderColor: '#444',
   },
   strategyActive: {
-    backgroundColor: '#2f95dc',
-    borderColor: '#2f95dc',
+    backgroundColor: ACCENT_GOLD,
+    borderColor: ACCENT_GOLD,
   },
   strategyActiveReplace: {
     backgroundColor: '#ff9800',

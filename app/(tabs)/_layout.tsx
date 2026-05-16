@@ -3,7 +3,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Link, Tabs } from 'expo-router';
 import { Pressable } from 'react-native';
 
-import Colors from '@/constants/Colors';
+import Colors, { ACCENT_GOLD } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useTranslation } from '@/utils/i18n';
@@ -23,7 +23,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#d4af37',
+        tabBarActiveTintColor: ACCENT_GOLD,
         tabBarInactiveTintColor: '#888',
         tabBarStyle: {
           backgroundColor: '#1a1a1a',
@@ -39,12 +39,13 @@ export default function TabLayout() {
         headerStyle: {
           backgroundColor: '#1a1a1a',
         },
-        headerTintColor: '#d4af37',
+        headerTintColor: ACCENT_GOLD,
         headerTitleStyle: {
           fontFamily: 'Cinzel-Bold',
           fontSize: 28,
           letterSpacing: 3,
           textTransform: 'uppercase',
+          color: ACCENT_GOLD,
         },
         headerTitleAlign: 'center',
         // Disable the static render of the header on web

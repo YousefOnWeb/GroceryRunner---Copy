@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Modal, TouchableOpacity, Switch, ActivityIndicator, I18nManager } from 'react-native';
-import { Text, View } from './Themed';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { ACCENT_GOLD } from '@/constants/Colors';
 import { useTranslation } from '@/utils/i18n';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, I18nManager, Modal, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import { Text, View } from './Themed';
 
 interface Entity {
   id: string;
@@ -96,7 +97,7 @@ export default function MergeModal({ visible, entityA, entityB, entityType, onCl
               value={keepAsAlias}
               onValueChange={setKeepAsAlias}
               trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={keepAsAlias ? '#2f95dc' : '#f4f3f4'}
+              thumbColor={keepAsAlias ? ACCENT_GOLD : '#f4f3f4'}
               disabled={isSubmitting}
             />
           </View>
